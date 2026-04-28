@@ -1,6 +1,6 @@
 # dotfiles
 
-Andrew's dotfiles, forked from [obra/dotfiles](https://github.com/obra/dotfiles).
+Personal dotfiles, forked from [obra/dotfiles](https://github.com/obra/dotfiles).
 
 ## Claude Code install
 
@@ -18,7 +18,7 @@ Use the actively maintained version (v5.0.7+). Skills evolve there faster than i
 
 ### Personal skills + CLAUDE.md: symlink from this repo
 
-`CLAUDE.md` and Andrew's personal skills (`java-style`, `grip-review`, `e2e-scenario-testing`) live in this repo. Install them into `~/.claude/` with symlinks:
+`CLAUDE.md` and the personal skills (`java-style`, `grip-review`, `e2e-scenario-testing`) live in this repo. Install them into `~/.claude/` with symlinks:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"

@@ -1,7 +1,7 @@
 ---
 name: codex-review
 description: Get an independent Codex CLI (GPT-5.5) second opinion in the background while YOU do the primary self-review in parallel. Both reviews are required; Codex does not replace self-review. Captures the Codex transcript to a file and extracts only the verdict, keeping exploration logs out of context.
-when_to_use: When Andrew asks for a "review" or "full review" of a commit, branch, or uncommitted change. When you want an independent second opinion before declaring work done. Before pushing a PR, when project hooks don't already gate on codex.
+when_to_use: When the user asks for a "review" or "full review" of a commit, branch, or uncommitted change. When you want an independent second opinion before declaring work done. Before pushing a PR, when project hooks don't already gate on codex.
 version: 2.0.0
 languages: all
 ---
@@ -34,7 +34,7 @@ Run this via Bash with `run_in_background: true`. Do it **before** you start sel
 
 This step is not optional. While Codex is analyzing, you review the same diff: correctness, edge cases, error handling, tests, style, and anything specific to this codebase that Codex wouldn't know. Produce your own written findings.
 
-Do NOT skip this and just wait on Codex. Do NOT treat Codex's output as "the review." Codex lacks the conversation context you have (what Andrew asked for, prior decisions, constraints discussed), hallucinates, and can miss codebase-specific issues. You cover what it misses; it covers what you miss.
+Do NOT skip this and just wait on Codex. Do NOT treat Codex's output as "the review." Codex lacks the conversation context you have (what the user asked for, prior decisions, constraints discussed), hallucinates, and can miss codebase-specific issues. You cover what it misses; it covers what you miss.
 
 ### 3. Merge findings and report
 
@@ -95,7 +95,7 @@ Triage: fix real defects now; document stylistic disagreements; ignore obvious m
 
 ## When project hooks enforce it
 
-Some projects gate push on a successful `codex review`. If there's no hook, Codex review is optional but available on request. Always run it when Andrew explicitly asks for a "review" or "full review".
+Some projects gate push on a successful `codex review`. If there's no hook, Codex review is optional but available on request. Always run it when the user explicitly asks for a "review" or "full review".
 
 When the dotfiles' codex-gate hooks are wired up, the gate only opens after a `codex-review-capture` invocation that includes one of `--commit <sha>`, `--base <branch>`, or `--uncommitted`. A bare `codex review` or `codex-review-capture` (no mode flag) writes no sentinel and the next push will be blocked. Always pass an explicit mode flag in gated projects.
 
