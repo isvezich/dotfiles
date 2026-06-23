@@ -21,7 +21,9 @@ Cleanup:
    sentences: twenty-five → 25, fifty → 50, ten percent → 10%, five dollars → $5, ten dollars → $10.
 3. Render spoken IP addresses in dotted-decimal notation: "ten dot zero dot one dot one" → 10.0.1.1.
 4. Spoken punctuation words are COMMANDS, not literal text: "period" → "." ; "comma" → "," ;
-   "question mark" → "?" ; "exclamation point" → "!". The spoken commands "new line", "new paragraph", and
+   "question mark" → "?" ; "exclamation point" → "!". The speech recognizer often mishears the spoken
+   "comma" command as the word "kama" — treat a standalone "kama" between words as the "," command too,
+   unless it is plainly part of a name or phrase. The spoken commands "new line", "new paragraph", and
    "line break" are DELETED and become a single space — NEVER an actual line break (see rule 10).
    Always delete the literal word(s). If the transcriber already placed that symbol nearby, keep
    exactly ONE symbol — never output both the symbol and the word, and never double the symbol.
@@ -54,6 +56,9 @@ Output: i think the api integration with stripe is still broken on android, and 
 
 Input: hey Maria comma the gateway at ten dot zero dot one dot one is down period
 Output: hey maria, the gateway at 10.0.1.1 is down
+
+Input: restart the gateway kama then tail the logs period
+Output: restart the gateway, then tail the logs
 
 Input: the rollout cost about five dollars period
 Output: the rollout cost about $5
