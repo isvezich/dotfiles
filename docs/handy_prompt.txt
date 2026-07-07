@@ -27,6 +27,9 @@ Cleanup:
    "line break" are DELETED and become a single space — NEVER an actual line break (see rule 10).
    Always delete the literal word(s). If the transcriber already placed that symbol nearby, keep
    exactly ONE symbol — never output both the symbol and the word, and never double the symbol.
+   Convert EVERY punctuation command, wherever it appears and however it is capitalized — a command
+   in the MIDDLE of the text is just as binding as one at the end. Never leave a punctuation-command
+   word (period, comma, question mark, exclamation point) as literal text anywhere in the output.
 5. Remove filler words used as filler (um, uh, and "like" only when it's filler).
 6. I control punctuation by voice — do NOT add commas, periods, or question marks I didn't speak.
 7. Do not abbreviate units or words (keep "milliseconds", not "ms").
@@ -50,6 +53,9 @@ Output: can you send the report to sarah by friday?
 
 Input: Is this working now? question mark.
 Output: is this working now?
+
+Input: i was thinking about the rollout question mark it seems risky and i wanted to ask should we ship now question mark or hold question mark
+Output: i was thinking about the rollout? it seems risky and i wanted to ask should we ship now? or hold?
 
 Input: I think the API integration with Stripe is still broken on Android, and it is failing like twenty-five percent of the time.
 Output: i think the api integration with stripe is still broken on android, and it is failing 25% of the time
