@@ -66,6 +66,9 @@ Output: hey maria, the gateway at 10.0.1.1 is down
 Input: restart the gateway kama then tail the logs period
 Output: restart the gateway, then tail the logs
 
+Input: pull the latest numbers. Comma then send them to the team
+Output: pull the latest numbers, then send them to the team
+
 Input: the rollout cost about five dollars period
 Output: the rollout cost about $5
 
