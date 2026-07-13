@@ -52,10 +52,12 @@ def deny_reason(out: str) -> str | None:
     return hso.get("permissionDecisionReason", "")
 
 
-def agent(model=None, tool="Agent") -> dict:
+def agent(model=None, tool="Agent", subagent_type=None) -> dict:
     tool_input: dict = {"description": "do a thing", "prompt": "..."}
     if model is not None:
         tool_input["model"] = model
+    if subagent_type is not None:
+        tool_input["subagent_type"] = subagent_type
     return {"tool_name": tool, "tool_input": tool_input}
 
 
@@ -115,6 +117,39 @@ def main() -> int:
     expect_allow("Agent with model=inherit", agent(model="inherit"))
     # Empty-string model is no choice at all — deny.
     expect_deny("Agent with empty model", agent(model=""))
+
+    # --- local-* named agents pin their model in frontmatter ---
+    # A `local-*` subagent is dispatched model-less on purpose: its frontmatter
+    # `model:` (a full gateway model id CC won't accept as a dispatch param) only
+    # takes effect when no tier param overrides it. So model-less local-* → allow.
+    expect_allow("Agent local-* no model", agent(subagent_type="local-implementer"))
+    # The prefix, not an exact name, is what qualifies — any local-* is allowed.
+    expect_allow("Agent local-anything no model", agent(subagent_type="local-anything"))
+    # A tier param on a local-* agent overrides its frontmatter and silently
+    # routes the work to the cloud instead of the local gateway model → deny.
+    expect_deny(
+        "Task local-* with model",
+        agent(model="sonnet", tool="Task", subagent_type="local-implementer"),
+        must_mention="cloud",
+    )
+    # `model: "inherit"` is the general escape hatch (allowed on a normal agent),
+    # but on a local-* agent it still routes to the session/cloud model, so it's
+    # denied like any tier — and the deny must name `inherit` so a user who reached
+    # for the documented escape hatch understands why it's refused here.
+    expect_deny(
+        "Agent local-* with inherit",
+        agent(model="inherit", subagent_type="local-x"),
+        must_mention="inherit",
+    )
+    # A real (non-local) subagent_type present in the payload must still be held
+    # to the tier rule — the local-* branch must not swallow the general case.
+    # Assert a token unique to the general deny ("session"), not "model" (which
+    # both deny messages contain), so this proves the general branch fired.
+    expect_deny(
+        "Agent non-local subagent no model",
+        agent(subagent_type="general-purpose"),
+        must_mention="session",
+    )
 
     # --- Workflow script-lint path ---
     all_have_model = """
