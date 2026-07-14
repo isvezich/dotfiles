@@ -149,7 +149,8 @@ For complete methodology, see the systematic-debugging skill
 
 - Prefer `uv` for Python package management: `uv run <script>` to execute, `uv add <pkg>` to install; no `requirements.txt`.
 - For Python syntax checks use `pyparse FILE` (wrapper around `ast.parse`, no `.pyc` side effects); avoid `python3 -c 'import ast; ast.parse(...)'` one-liners and `python3 -m py_compile` (writes `__pycache__/` litter).
-- Prefer `rg` (ripgrep) over `grep -r` for recursive code search — faster and respects `.gitignore`.
+- Prefer `rg` (ripgrep) over `grep -r` for recursive code search — faster and respects `.gitignore`. To search a directory other than cwd, pass it as a path argument (`rg pattern /some/path`) rather than `cd`-ing there first; only omit the path when searching the current cwd.
+- Prefer the `gh` CLI over anonymous HTTP whenever fetching from GitHub — it authenticates, dodging the low anonymous rate limits that return 429s. Rewrite `raw.githubusercontent.com/{owner}/{repo}/{ref}/{path}` and `github.com/{owner}/{repo}/blob/{ref}/{path}` fetches to `gh api repos/{owner}/{repo}/contents/{path}?ref={ref} -H "Accept: application/vnd.github.raw+json"` (raw URLs silently ignore auth tokens, so `gh api` is the only authenticated path to file content). Use `gh` / `gh api` for releases, PRs, issues, and REST calls too, rather than anonymous WebFetch or curl.
 - All new code files start with two lines beginning `ABOUTME: ` so they're easily greppable.
 - NEVER remove code comments unless you can PROVE they are actively false.
 - NEVER make code changes unrelated to the current task. Document follow-ups in the journal rather than fixing them inline.
