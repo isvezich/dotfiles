@@ -141,8 +141,26 @@ def main() -> int:
         agent(model="inherit", subagent_type="local-x"),
         must_mention="inherit",
     )
+    # --- cloud-* named agents pin their model in frontmatter too ---
+    # Same contract as local-*: a `cloud-*` subagent (e.g. cloud-luna) pins a
+    # gateway DEPLOYMENT name in frontmatter and is dispatched model-less on
+    # purpose. A tier param overrides the pin and misroutes to the session /
+    # cloud-default model instead of the pinned deployment.
+    expect_allow("Agent cloud-* no model", agent(subagent_type="cloud-luna"))
+    expect_allow("Agent cloud-anything no model", agent(subagent_type="cloud-anything"))
+    expect_deny(
+        "Task cloud-* with model",
+        agent(model="sonnet", tool="Task", subagent_type="cloud-luna"),
+        must_mention="cloud",
+    )
+    expect_deny(
+        "Agent cloud-* with inherit",
+        agent(model="inherit", subagent_type="cloud-x"),
+        must_mention="inherit",
+    )
+
     # A real (non-local) subagent_type present in the payload must still be held
-    # to the tier rule — the local-* branch must not swallow the general case.
+    # to the tier rule — the local-*/cloud-* branch must not swallow the general case.
     # Assert a token unique to the general deny ("session"), not "model" (which
     # both deny messages contain), so this proves the general branch fired.
     expect_deny(

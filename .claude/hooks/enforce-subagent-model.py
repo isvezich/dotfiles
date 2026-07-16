@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ABOUTME: PreToolUse hook forcing an explicit `model` on subagent dispatches —
 # ABOUTME: denies model-less Agent/Task calls (except frontmatter-pinned `local-*`
-# ABOUTME: agents) and Workflow scripts with bare agent().
+# ABOUTME: / `cloud-*` agents) and Workflow scripts with bare agent().
 
 import json
 import re
@@ -189,20 +189,22 @@ def main() -> None:
     tool_input = data.get("tool_input") or {}
 
     if tool_name in ("Agent", "Task"):
-        # A `local-*` subagent pins its model in frontmatter with a full gateway
-        # model id — one CC's dispatch `model` enum won't accept. That frontmatter
-        # only wins when the dispatch is model-less, so model-less local-* is the
-        # intended path (allow). A tier param instead OVERRIDES the frontmatter and
-        # silently routes the work to the cloud, defeating the point (deny).
+        # A `local-*` or `cloud-*` subagent pins its model in frontmatter with a
+        # full gateway model id / deployment name — one CC's dispatch `model` enum
+        # won't accept. That frontmatter only wins when the dispatch is model-less,
+        # so model-less local-*/cloud-* is the intended path (allow). A tier param
+        # instead OVERRIDES the frontmatter and silently routes the work to the
+        # session / cloud-default model, defeating the point (deny).
         subagent = tool_input.get("subagent_type") or ""
-        if subagent.startswith("local-"):
+        if subagent.startswith(("local-", "cloud-")):
             if tool_input.get("model"):
                 deny(
-                    "`local-*` subagents pin their own model in frontmatter with a "
-                    "full gateway model id. Dispatch them WITHOUT a `model` param — "
-                    "a `model` of any kind (a tier like sonnet/opus/haiku/fable, or "
-                    "`inherit`) overrides the frontmatter and silently routes the "
-                    "work to the cloud instead of the local gateway model."
+                    "`local-*` and `cloud-*` subagents pin their own model in "
+                    "frontmatter with a full gateway model id / deployment. Dispatch "
+                    "them WITHOUT a `model` param — a `model` of any kind (a tier "
+                    "like sonnet/opus/haiku/fable, or `inherit`) overrides the "
+                    "frontmatter and silently routes the work to the session / "
+                    "cloud-default model instead of the pinned gateway deployment."
                 )
             sys.exit(0)
         if not tool_input.get("model"):
