@@ -43,7 +43,15 @@ When asked to do something, just do it - including obvious follow-up actions nee
 - YAGNI. The best code is no code. Don't add features we don't need right now.
 - When it doesn't conflict with YAGNI, architect for extensibility and flexibility.
 
+## Time estimates
 
+- When giving estimates, use lines of code, not wall-clock time. Assume the work is done by a frontier LLM — never estimate in human engineer hours.
+
+## Automation
+
+- Prefer automating a task over writing a throwaway one-liner. If you're doing something once, you'll probably do it again, and reproducibility matters.
+- Scripts MUST have names and at least brief documentation of when and why to use them, good help text, and error reporting designed for your own use.
+- Scripts MUST carefully manage their output so they don't overwhelm your context: show just what you need, and provide a way to get the rest of the logs if you need them.
 
 ## Test Driven Development  (TDD)
 
