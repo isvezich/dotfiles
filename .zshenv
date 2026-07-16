@@ -1,0 +1,56 @@
+# Documentation: https://github.com/romkatv/zsh4humans/blob/v5/README.md.
+#
+# Do not modify this file unless you know exactly what you are doing.
+# It is strongly recommended to keep all shell customization and configuration
+# (including exported environment variables such as PATH) in ~/.zshrc or in
+# files sourced from ~/.zshrc. If you are certain that you must export some
+# environment variables in ~/.zshenv, do it where indicated by comments below.
+
+if [ -n "${ZSH_VERSION-}" ]; then
+  # If you are certain that you must export some environment variables
+  # in ~/.zshenv (see comments at the top!), do it here:
+  #
+  #   export GOPATH=$HOME/go
+  #
+  # gog CLI needs GOG_KEYRING_PASSWORD on every run to unlock its token keyring.
+  # Read it from a 0600 file so the secret never lives in this repo; the guard
+  # keeps it inert on hosts without that file. Set here (above the non-interactive
+  # return) so agents and cron get it too, not only interactive shells.
+  [ -r "$HOME/.config/gog/keyring-password" ] && export GOG_KEYRING_PASSWORD="$(cat "$HOME/.config/gog/keyring-password")"
+  #
+  # Do not change anything else in this file.
+
+  : ${ZDOTDIR:=$HOME/.config/zsh}   # keep zsh config under ~/.config/zsh, not $HOME
+  setopt no_global_rcs
+  if [[ -o no_interactive && -z "${Z4H_BOOTSTRAPPING-}" ]]; then
+    # Non-interactive, non-login shells (e.g. `ssh host cmd`, mosh-server) skip
+    # ~/.zprofile, so add Homebrew to PATH here before z4h bails out.
+    [[ -d /opt/homebrew/bin ]] && export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+    return
+  fi
+  setopt no_rcs
+  unset Z4H_BOOTSTRAPPING
+fi
+
+Z4H_URL="https://raw.githubusercontent.com/romkatv/zsh4humans/v5"
+: "${Z4H:=${XDG_CACHE_HOME:-$HOME/.cache}/zsh4humans/v5}"
+
+umask o-w
+
+if [ ! -e "$Z4H"/z4h.zsh ]; then
+  mkdir -p -- "$Z4H" || return
+  >&2 printf '\033[33mz4h\033[0m: fetching \033[4mz4h.zsh\033[0m\n'
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL -- "$Z4H_URL"/z4h.zsh >"$Z4H"/z4h.zsh.$$ || return
+  elif command -v wget >/dev/null 2>&1; then
+    wget -O-   -- "$Z4H_URL"/z4h.zsh >"$Z4H"/z4h.zsh.$$ || return
+  else
+    >&2 printf '\033[33mz4h\033[0m: please install \033[32mcurl\033[0m or \033[32mwget\033[0m\n'
+    return 1
+  fi
+  mv -- "$Z4H"/z4h.zsh.$$ "$Z4H"/z4h.zsh || return
+fi
+
+. "$Z4H"/z4h.zsh || return
+
+setopt rcs

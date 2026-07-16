@@ -1,0 +1,75 @@
+# dotfiles manifest — <repo-relative path> [macos|linux]
+# Deploy destination mirrors the path under $HOME.
+.tmux.conf
+.gitconfig
+.hammerspoon        macos
+bin/coderabbit-extract
+bin/flatten.js
+bin/git-worktree-llm
+bin/homedir-sync
+bin/idb
+bin/lock-stray-zshrc
+.config/karabiner/karabiner.json
+.config/ccstatusline/settings.json
+.config/mise/config.toml
+.config/clipfan/tmux.conf
+.config/leash/config.toml
+.config/cage/config.json
+.config/sprout/settings.json
+.config/git/ignore
+.config/zellij/config.kdl
+.coderabbit-extractor
+.zshenv
+.bash_profile
+.config/zsh/.zshrc
+.config/zsh/.p10k.zsh                       # z4h prompt config (ZDOTDIR path; z4h auto-loads this)
+.config/zsh/macos.zsh        macos
+.config/zsh/.zprofile
+.config/zsh/linux.zsh        linux
+
+# macOS defaults — curated system settings, reconciled via `homedir-manager defaults`
+# (see the maintaining-macos-defaults skill). Data only; nothing is applied automatically.
+.config/macos-defaults/desired.tsv          macos
+.config/macos-defaults/watched-domains      macos
+.config/macos-defaults/noise-deny           macos
+
+# Claude config — CLAUDE.md, commands, skills, and the status-line script. Skills are listed
+# individually so that host-specific project-linked skills under ~/.claude/skills are left
+# untouched. (settings.json lives in the private repo — it references the work org.)
+.claude/CLAUDE.md
+.claude/statusline-command.sh
+.claude/commands/par.md
+.claude/commands/story-loop.md
+.claude/skills/e2e-scenario-testing
+.claude/skills/maintaining-documentation
+.claude/skills/mcp-cli
+.claude/skills/roborev-design-review
+.claude/skills/roborev-design-review-branch
+.claude/skills/roborev-fix
+.claude/skills/roborev-refine
+.claude/skills/roborev-respond
+.claude/skills/roborev-review
+.claude/skills/roborev-review-branch
+.claude/skills/syncing-obsidian
+.claude/skills/windows-vm
+
+# Codex config — generic agent rules and skills. The skills dir is merged child-by-child so
+# new skills are picked up without a manifest edit, and host-local / external-symlinked skills
+# in ~/.codex/skills are left untouched. (The private sprout skill is merged in from the private
+# repo; default.rules is NOT tracked — it accretes per-command trust state that leaks history.)
+.codex/AGENTS.md
+merge-children .codex/skills
+
+# Editor / app config files (macOS Application Support paths contain a space — handled by the
+# engine's manifest parser). Editor settings only; app state/caches are left untracked.
+Library/Application Support/Code/User/settings.json                 macos
+Library/Application Support/Cursor/User/settings.json               macos
+Library/Application Support/Cursor/User/keybindings.json            macos
+Library/Application Support/Windsurf/User/settings.json             macos
+Library/Application Support/com.mitchellh.ghostty/config            macos
+.config/opencode/opencode.json
+
+# Other tool configs (portable, non-secret). Each tool's surrounding dir is tool-managed
+# state — only the authored config file is tracked.
+.config/kilo/opencode.json
+.config/packnplay/config.json
