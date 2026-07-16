@@ -33,15 +33,13 @@ done
 
 This coexists with the Superpowers plugin skills and any other skill dirs under `~/.claude/skills/`. `e2e-scenario-testing` (merged from upstream) verifies a running app through its real interface via agent-run scenario cards; see [`docs/e2e-scenario-testing.md`](docs/e2e-scenario-testing.md) for when and how to use it. The many other upstream skills under `.claude/skills/` (roborev, obsidian, windows-vm, …) are left unsymlinked and inert.
 
-### Slash commands: symlink from this repo
+### Slash commands: symlink the whole dir from this repo
 
-Two commands are wired globally:
+Unlike skills (which must coexist with the Superpowers plugin under `~/.claude/skills/`, so they're symlinked per-skill), the commands dir has no such neighbor — symlink the whole thing, and every command in this repo is wired at once:
 
 ```bash
-mkdir -p ~/.claude/commands
-for c in par story-loop; do
-  ln -sf "$PWD/.claude/commands/$c.md" "$HOME/.claude/commands/$c.md"
-done
+cd "$(git rev-parse --show-toplevel)"
+ln -sfn "$PWD/.claude/commands" "$HOME/.claude/commands"
 ```
 
 - `/par` — dispatches two subagents to review your work adversarially, competing to find the most legitimate issues (disqualified for BS or inflated severity). A lightweight, model-internal mid-task review; complements the heavier `reviewers:codex` / `reviewers:bitbot` completion gate.
