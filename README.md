@@ -18,7 +18,7 @@ Use the actively maintained version (v5.0.7+). Skills evolve there faster than i
 
 ### Personal skills + CLAUDE.md: symlink from this repo
 
-`CLAUDE.md` and Andrew's personal skills (`java-style`, `grip-review`) live in this repo. Install them into `~/.claude/` with symlinks:
+`CLAUDE.md` and Andrew's personal skills (`java-style`, `grip-review`, `e2e-scenario-testing`) live in this repo. Install them into `~/.claude/` with symlinks:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -26,12 +26,26 @@ mkdir -p ~/.claude/skills
 
 ln -sf "$PWD/.claude/CLAUDE.md" ~/.claude/CLAUDE.md
 
-for s in java-style grip-review; do
+for s in java-style grip-review e2e-scenario-testing; do
   ln -sf "$PWD/.claude/skills/$s" "$HOME/.claude/skills/$s"
 done
 ```
 
-This coexists with the Superpowers plugin skills and any other skill dirs under `~/.claude/skills/`.
+This coexists with the Superpowers plugin skills and any other skill dirs under `~/.claude/skills/`. `e2e-scenario-testing` (merged from upstream) verifies a running app through its real interface via agent-run scenario cards; see [`docs/e2e-scenario-testing.md`](docs/e2e-scenario-testing.md) for when and how to use it. The many other upstream skills under `.claude/skills/` (roborev, obsidian, windows-vm, …) are left unsymlinked and inert.
+
+### Slash commands: symlink from this repo
+
+Two commands are wired globally:
+
+```bash
+mkdir -p ~/.claude/commands
+for c in par story-loop; do
+  ln -sf "$PWD/.claude/commands/$c.md" "$HOME/.claude/commands/$c.md"
+done
+```
+
+- `/par` — dispatches two subagents to review your work adversarially, competing to find the most legitimate issues (disqualified for BS or inflated severity). A lightweight, model-internal mid-task review; complements the heavier `reviewers:codex` / `reviewers:bitbot` completion gate.
+- `/story-loop` — drives a repo to a known-good state by cataloguing every capability as `e2e-scenario-testing` cards, then looping test → fix → re-test. Pairs with the `e2e-scenario-testing` skill.
 
 The grip-review skill also needs its SessionEnd hook symlinked:
 
