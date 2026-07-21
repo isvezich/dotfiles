@@ -79,6 +79,7 @@ The Claude Code hooks in `.claude/hooks/`. All are opt-in: each is a script you 
 |------|-----------------|--------------|
 | [`enforce-subagent-model.py`](#optional-enforce-an-explicit-model-on-every-subagent-dispatch) | PreToolUse — `Agent`/`Task`/`Workflow` | Deny a subagent dispatch with no explicit `model` (except frontmatter-pinned `local-*` agents) |
 | [`block-git-dash-c.py`](#optional-bash-behavior-nudge-hooks) | PreToolUse — `Bash(git */cd *)` | Block redundant `git -C` / `cd <cwd> && git …` |
+| [`block-git-add-all.py`](#optional-bash-behavior-nudge-hooks) | PreToolUse — `Bash(git *)` | Block bulk `git add -A`/`--all`/`.`/`./`/`*` |
 | [`read-write-edit-block.py`](#optional-bash-behavior-nudge-hooks) | PreToolUse — `Bash(cat/head/sed/echo *)` | Nudge single-file `cat`/`head`/`sed`/`echo` to Read/Write/Edit |
 | [`codex-gate.sh`](#optional-codex-pre-push-gate) (+ `codex-gate-pass.sh`) | PreToolUse `git push`/`gh pr create` + PostToolUse | Block a push/PR until a `codex review` ran on the diff |
 
@@ -114,10 +115,11 @@ Activate the gate in a project by merging the contents of [`.claude/hooks/settin
 
 ### Optional: bash behavior-nudge hooks
 
-Two PreToolUse hooks that redirect Bash invocations to the dedicated tool when one would do the same job better:
+Three PreToolUse hooks that steer Bash invocations toward better-behaved forms — the dedicated Read/Write/Edit tools, cleaner git usage, or explicit staging:
 
 - `block-git-dash-c.py` — denies `git -C/--git-dir/--work-tree <path-in-cwd>` and `cd <cwd> && git ...`. Both defeat Claude Code's auto-allow matcher for read-only git subcommands and force needless permission prompts.
 - `read-write-edit-block.py` — denies single-file `cat`/`head`/`sed`/`echo` invocations covered by Read/Write/Edit. Skips pipes, multi-file, sed scripts, echo flags (`-n`/`-e`), and other shapes the dedicated tools can't replicate.
+- `block-git-add-all.py` — denies bulk `git add` (`-A`, `--all`, `.`, `./`, `*`) that sweeps untracked scratch/litter into the index. Allows explicit paths, `git add <dir>/`, targeted globs (`*.py`), and `-u`. Parses with bashlex; fail-open.
 
 Install the scripts:
 
@@ -125,12 +127,12 @@ Install the scripts:
 cd "$(git rev-parse --show-toplevel)"
 mkdir -p ~/.claude/hooks
 
-for h in block-git-dash-c.py read-write-edit-block.py; do
+for h in block-git-dash-c.py read-write-edit-block.py block-git-add-all.py; do
   ln -sf "$PWD/.claude/hooks/$h" "$HOME/.claude/hooks/$h"
 done
 ```
 
-Activate per-machine by merging entries from [`.claude/settings.git-dash-C-example.json`](.claude/settings.git-dash-C-example.json) and [`.claude/settings.read-write-edit-block-example.json`](.claude/settings.read-write-edit-block-example.json) into `~/.claude/settings.json`. Both examples use narrow `if: Bash(<cmd> *)` matchers so the hooks only run for the relevant commands.
+Activate per-machine by merging entries from [`.claude/settings.git-dash-C-example.json`](.claude/settings.git-dash-C-example.json), [`.claude/settings.read-write-edit-block-example.json`](.claude/settings.read-write-edit-block-example.json), and [`.claude/settings.block-git-add-all-example.json`](.claude/settings.block-git-add-all-example.json) into `~/.claude/settings.json`. The examples use narrow `if: Bash(<cmd> *)` matchers so the hooks only run for the relevant commands.
 
 ### Optional: enforce an explicit model on every subagent dispatch
 
