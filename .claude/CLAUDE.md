@@ -85,7 +85,7 @@ YOU MUST write comments explaining WHAT and WHY, never temporal context or what 
 - YOU MUST TRACK All non-trivial changes in git.
 - YOU MUST commit frequently throughout the development process, even if your high-level tasks are not yet done. Commit your journal entries.
 - NEVER SKIP, EVADE OR DISABLE A PRE-COMMIT HOOK
-- NEVER use `git add -A` unless you've just done a `git status` - Don't add random test files to the repo.
+- NEVER stage in bulk with `git add -A`, `--all`, `git add .`, or `git add *`. Stage the specific paths you mean — don't sweep scratch/litter into the repo.
 - YOU MUST ALWAYS use an explicit refspec when pushing. NEVER `git push origin branchname` — ALWAYS `git push origin localref:refs/heads/remote-branch-name`. Worktree branches, tracking branches, and branch renames can cause implicit pushes to the wrong remote branch (e.g. main). An explicit refspec makes the destination unambiguous.
 - NEVER use `git -C <path>` when cwd is already in the target repo — it triggers an unnecessary sandbox approval prompt. Use `-C <path>` ONLY when cwd is genuinely not the target (e.g., running git on a different repo from a worktree or investigation detour). Same anti-pattern: `cd <path> && git ...` when already in `<path>`.
 - When dispatching a subagent that needs to operate in a specific working directory (e.g. a git worktree), `cd` there in the main session BEFORE the Agent call. Subagents inherit cwd at dispatch but cannot change it persistently — `cd` doesn't persist between Bash calls in agent threads, and `EnterWorktree` is not available to subagents. If a subagent finds its cwd wrong, the right action is to bail and ask the parent to redispatch with the correct cwd, not paper over with chained `cd` or `git -C`.
