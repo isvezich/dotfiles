@@ -81,6 +81,7 @@ The Claude Code hooks in `.claude/hooks/`. All are opt-in: each is a script you 
 | [`block-git-dash-c.py`](#optional-bash-behavior-nudge-hooks) | PreToolUse — `Bash(git */cd *)` | Block redundant `git -C` / `cd <cwd> && git …` |
 | [`block-git-add-all.py`](#optional-bash-behavior-nudge-hooks) | PreToolUse — `Bash(git *)` | Block bulk `git add -A`/`--all`/`.`/`./`/`*` |
 | [`read-write-edit-block.py`](#optional-bash-behavior-nudge-hooks) | PreToolUse — `Bash(cat/head/sed/echo *)` | Nudge single-file `cat`/`head`/`sed`/`echo` to Read/Write/Edit |
+| [`block-docker-root.py`](#optional-block-docker-containers-running-as-root) | PreToolUse — `Bash(docker */docker-compose *)` | Deny `docker run`/`exec`/`create`/`compose run`/`compose exec` lacking a non-root `--user` |
 | [`codex-gate.sh`](#optional-codex-pre-push-gate) (+ `codex-gate-pass.sh`) | PreToolUse `git push`/`gh pr create` + PostToolUse | Block a push/PR until a `codex review` ran on the diff |
 
 (`cleanup-grip.sh`, a `SessionEnd` hook that kills leftover grip servers, belongs to the grip-review skill and is covered with it above.)
@@ -133,6 +134,24 @@ done
 ```
 
 Activate per-machine by merging entries from [`.claude/settings.git-dash-C-example.json`](.claude/settings.git-dash-C-example.json), [`.claude/settings.read-write-edit-block-example.json`](.claude/settings.read-write-edit-block-example.json), and [`.claude/settings.block-git-add-all-example.json`](.claude/settings.block-git-add-all-example.json) into `~/.claude/settings.json`. The examples use narrow `if: Bash(<cmd> *)` matchers so the hooks only run for the relevant commands.
+
+### Optional: block docker containers running as root
+
+`block-docker-root.py` is a PreToolUse Bash hook that denies `docker run`, `docker exec`, `docker create`, their `docker container …` aliases, and `docker compose run`/`exec` (and `docker-compose …`) when they lack an explicit **non-root numeric** `--user` — because those default to running the container process as **root** (uid 0), which writes root-owned files into mounted volumes and has broad host-mount access. Allowed: a non-zero numeric uid (`--user 1000`, `--user 65532`) or `--user $(id -u):$(id -g)`. Denied: no `--user`, `--user 0`/`root`, or a username (a name isn't proof of a non-root uid). The deny message steers Claude to `--user $(id -u):$(id -g)` or to hand you the exact command to run manually.
+
+It parses docker's real option grammar with bashlex (per-subcommand value-flag tables, short-flag getopt), so a `--user` belonging to the in-container command isn't mistaken for docker's, and it makes no subprocess calls. Unlike the behavior-nudge hooks it **fails closed**: a parse failure or hook error denies a docker command in command position (but never a non-docker call that merely mentions `docker`).
+
+**This is best-effort accident-prevention, not a security boundary.** Being in the `docker` group already grants host-root via the socket, so a shell hook can't stop a determined caller; it stops the ordinary mistake of running a container as root without thinking. Known gaps (by design): `docker start`/`restart` and `compose up`/`start`/`restart` (no CLI `--user`), invocations that don't begin with the bare command (`DOCKER_HOST=x docker …`, `/usr/bin/docker …`, `env docker …`), shell-expansion injection, non-default daemons, and flag-table drift. See the design spec for the full list.
+
+Install the script:
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+mkdir -p ~/.claude/hooks
+ln -sf "$PWD/.claude/hooks/block-docker-root.py" "$HOME/.claude/hooks/block-docker-root.py"
+```
+
+Activate per-machine by merging [`.claude/settings.block-docker-root-example.json`](.claude/settings.block-docker-root-example.json) into `~/.claude/settings.json`. It uses two `if: Bash(docker *)` / `Bash(docker-compose *)` matchers so the hook only runs for docker commands.
 
 ### Optional: enforce an explicit model on every subagent dispatch
 
