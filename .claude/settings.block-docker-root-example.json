@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/achen/.claude/hooks/block-docker-root.py",
+            "if": "Bash(docker *)"
+          },
+          {
+            "type": "command",
+            "command": "/home/achen/.claude/hooks/block-docker-root.py",
+            "if": "Bash(docker-compose *)"
+          }
+        ]
+      }
+    ]
+  }
+}
