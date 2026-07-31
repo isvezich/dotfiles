@@ -40,3 +40,6 @@ bin/debug-mcp-wrapper.sh
 artifacts/
 node_modules/
 __pycache__/
+# superpowers brainstorming/writing-plans design docs — kept LOCAL, never tracked
+# in this PUBLIC repo (they can narrate private/companion-project context)
+docs/superpowers/
