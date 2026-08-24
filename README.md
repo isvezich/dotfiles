@@ -18,7 +18,9 @@ Use the actively maintained version (v5.0.7+). Skills evolve there faster than i
 
 ### Personal skills + CLAUDE.md: symlink from this repo
 
-`CLAUDE.md` and the personal skills (`java-style`, `grip-review`, `e2e-scenario-testing`) live in this repo. Install them into `~/.claude/` with symlinks:
+`CLAUDE.md` and the personal skills (`java-style`, `grip-review`,
+`e2e-scenario-testing`, and the `triage`/`feature`/`work`/`ship`/`dev-workflow`
+set) live in this repo. Install them into `~/.claude/` with symlinks:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -26,7 +28,7 @@ mkdir -p ~/.claude/skills
 
 ln -sf "$PWD/.claude/CLAUDE.md" ~/.claude/CLAUDE.md
 
-for s in java-style grip-review e2e-scenario-testing; do
+for s in java-style grip-review e2e-scenario-testing triage feature work ship dev-workflow; do
   ln -sf "$PWD/.claude/skills/$s" "$HOME/.claude/skills/$s"
 done
 ```
@@ -53,6 +55,30 @@ ln -sf "$PWD/.claude/hooks/cleanup-grip.sh" "$HOME/.claude/hooks/cleanup-grip.sh
 ```
 
 Then merge `.claude/settings.grip-review-example.json` into your live `~/.claude/settings.json` (the live file is intentionally not tracked; the example shows the allow rule and the SessionEnd hook entry to add).
+
+#### The dev-workflow skills
+
+`triage`, `feature`, `work`, and `ship` are a four-verb development loop that
+combines the Superpowers process spine with Matt Pocock's design skills, wired
+to keep the coordinator context lean. They are **thin routers** — they invoke
+the tuned upstream skills in order and stop at human gates; they do not
+reimplement upstream content.
+
+```
+/triage   → decide what to build        (skip if no inbound queue)
+/feature  → design + break down work     approve spec, then approve tickets
+/work     → execute all tickets          autonomous — no gate between tickets
+/ship     → verify + integrate           choose merge / PR / keep
+```
+
+`dev-workflow/` holds the shared reference (`workflow.md`, the single source of
+truth) and `scripts/workflow-state.sh`, which scaffolds and reads a project's
+**local-only** tracker. All triage/specs/tickets are local files in the project
+repo — never GitHub Issues or Jira. Per project, the loop uses `CONTEXT.md`,
+`docs/specs/`, `docs/decisions/` (ADRs), `tickets/`, and `.ai/workflow.yaml`
+(the durable ledger / recovery map). Run
+`workflow-state.sh init` in a project to scaffold that layout. Tests:
+`bash tests/dev-workflow/test.sh`.
 
 ### Helper scripts: symlink from ~/bin
 
