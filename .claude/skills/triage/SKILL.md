@@ -1,5 +1,6 @@
 ---
 name: triage
+disable-model-invocation: true
 description: Decide what to build from an inbound request, working a LOCAL ticket tracker only (never GitHub/Jira). Thin router over mattpocock-skills:triage with local-file enforcement. Invoke explicitly as the first gate; skip when work starts from your own idea (go straight to /feature).
 when_to_use: When there is an inbound queue of requests/bugs to evaluate before committing to build. The user runs /triage. Skip for solo idea-driven work — /feature's grilling is the intake there.
 version: 1.0.0

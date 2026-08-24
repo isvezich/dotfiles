@@ -1,5 +1,6 @@
 ---
 name: feature
+disable-model-invocation: true
 description: Start an approved feature — design it, pin the domain language, write a local spec, and break it into local tickets. Thin router chaining Superpowers brainstorming + Matt Pocock grill-with-docs/to-spec/to-tickets, all writing LOCAL files only (docs/specs, docs/decisions, tickets). Two human gates. Invoke explicitly as /feature.
 when_to_use: When starting a new, approved piece of work and you need a design, spec, and ticket breakdown before implementation. The user runs /feature. Follows /triage, or is itself the intake for solo idea-driven work.
 version: 1.0.0

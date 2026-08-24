@@ -1,5 +1,6 @@
 ---
 name: work
+disable-model-invocation: true
 description: Execute the approved tickets in an isolated worktree via Superpowers subagent-driven development (fresh agent + TDD + review + verification per ticket), with a parallel Matt Pocock two-axis code review. Runs the tickets autonomously — no human gate between them. Updates the durable ledger after each. Invoke explicitly as /work.
 when_to_use: When a feature has an approved spec and local tickets and you are ready to implement. The user runs /work. Follows /feature.
 version: 1.0.0

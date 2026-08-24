@@ -1,5 +1,6 @@
 ---
 name: ship
+disable-model-invocation: true
 description: Finish a feature — fresh full-suite verification, then present the merge/PR/keep integration menu and clean up the worktree. Thin router over Superpowers verification-before-completion + finishing-a-development-branch. One human gate at the integration choice. Invoke explicitly as /ship.
 when_to_use: When all of a feature's tickets are done and you are ready to verify and integrate. The user runs /ship. Follows /work.
 version: 1.0.0
