@@ -39,8 +39,8 @@ action, out-of-worktree side effect, or a plan so broken every path is a guess).
 
 4. **Two-axis review** — invoke `mattpocock-skills:code-review` (Standards ‖
    Spec) on the ticket's diff, in parallel with the Superpowers task review.
-   Per the user's CLAUDE.md, also fire `codex-review` alongside any Superpowers
-   review. Dispatch reviews in one message so they run concurrently.
+   Per the user's CLAUDE.md, also fire `reviewers:codex` alongside any
+   Superpowers review. Dispatch reviews in one message so they run concurrently.
 
 5. **Close the ticket** — set the ticket's `**Status:** done`, clear
    `current_ticket`, and prune any now-stale notes from `.ai/workflow.yaml`.
