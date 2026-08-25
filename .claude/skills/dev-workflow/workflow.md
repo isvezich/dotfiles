@@ -24,7 +24,7 @@ namespace so ids can't collide across features.
 | Artifact | Location |
 |----------|----------|
 | Intake / triage records | `requests/<id>.md` (a `**Status:**` line — *active:* `needs-info` / `ready-for-human` (awaiting the human gate); *terminal:* `wontfix` / `adopted` (with a `→ <feature-slug>` pointer)) |
-| Specs | `docs/specs/<slug>.md` (with a `**Base:** <ref>` line — the feature's fork-point) |
+| Specs | `docs/specs/<feature-slug>.md` (with a `**Base:** <ref>` line — the feature's fork-point) |
 | ADRs / decisions | `docs/decisions/` |
 | Domain glossary | `CONTEXT.md` |
 | Execution tickets | `tickets/<feature-slug>/<NN>-<slug>.md` (a `**Status:**` line: `ready-for-agent` / `in-progress` / `done` / `blocked`) |
@@ -83,7 +83,7 @@ so it's a review nudge, not proof the pushed objects were reviewed. The
 ## Known limitations (by design)
 
 - A manual-aid checklist, not an enforced system: no commit-pinned approval and
-  no crash-consistent state. `requests/` + per-feature `tickets/<slug>/` keep
+  no crash-consistent state. `requests/` + per-feature `tickets/<feature-slug>/` keep
   intake and features from interfering, but nothing *enforces* one-feature-at-a-time
   — you drive the gates and own status/commit integrity by hand (humans can still
   create contradictory statuses or work against a changed spec).

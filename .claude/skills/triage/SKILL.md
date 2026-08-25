@@ -32,10 +32,12 @@ Shared rules: `~/.claude/skills/dev-workflow/workflow.md`.
 
 3. **HUMAN GATE ↯** — present your category + status recommendation; the
    maintainer directs. Record the outcome as `requests/<id>.md` with a
-   `**Status:**` line.
+   `**Status:**` line, and **commit that record** (a distinct intake commit on
+   the current branch) before returning — don't leave the intake decision as an
+   uncommitted change that follows a checkout or blocks the next clean start.
 
-4. **Adopt for build** → hand off to `/feature` (which creates
-   `tickets/<feature-slug>/`). Mark the `requests/<id>.md` `**Status:** adopted`
-   with a `→ <feature-slug>` pointer — a terminal status, so a later `/triage`
-   run can tell adopted items from those still `ready-for-human` (awaiting a
-   decision).
+4. **Adopt for build** → mark the `requests/<id>.md` `**Status:** adopted` with a
+   `→ <feature-slug>` pointer (a terminal status, so a later `/triage` run tells
+   adopted items from those still `ready-for-human`), **commit it**, then hand off
+   to `/feature` from a clean tree — `/feature` branches from here and creates
+   `tickets/<feature-slug>/`.

@@ -59,25 +59,45 @@ here: it is coordination metadata, not transactional machinery.
 ## Accepted risks / explicitly declined machinery
 
 A prose checklist cannot *enforce* invariants, so a rigorous reviewer will always
-find "nothing stops X." Round-8 review confirmed the concrete bugs are fixed
-(base-ref provenance, commit-before-review, `adopted` intake status, scope→spec
-gate) but flagged deeper enforcement gaps. These are **declined as YAGNI for a
-solo workflow** and accepted as risks the human owns, not defects to automate
-away:
+find "nothing stops X." Rounds 8–9 fixed the concrete bugs and adopted the
+**cheap invariants** a reviewer flagged — because they're small guards, not a
+state machine:
+
+- **Adopted (cheap guards, not machinery):** helper anchors all paths at
+  `git rev-parse --show-toplevel` and validates the slug grammar; `**Base:**` is
+  verified (`rev-parse --verify` + `merge-base --is-ancestor`); `/ship` captures
+  an in-context `REVIEW_HEAD` and refuses to finish unless `HEAD == REVIEW_HEAD`
+  on a clean tree; `/work`+`/ship` re-review after any fix; reviewer briefs carry
+  the ticket/spec so review checks compliance, not just diff defects.
+
+Still **declined as YAGNI for a solo workflow** and accepted as risks the human
+owns, not defects to automate:
 
 - **Push-gate attestation.** The review sentinel attests *a review of the current
   checkout ran*; it is not bound to the push's refs or remote tip and its `/tmp`
   key is same-user forgeable. A real remote-SHA `pre-push` hook is not built —
   the gate is documented as a process aid, not a security boundary.
-- **Feature/branch manifest.** No retained target-ref, ancestry validation at
-  `/ship`, or stacked-feature semantics. Convention is one feature per branch,
-  one canonical `<slug>` for `docs/specs/<slug>.md` and `tickets/<slug>/`, and a
-  `**Base:**` fork-point in the spec; the human keeps them consistent.
-- **Immutable review state.** No `REVIEW_HEAD` tracking that auto-invalidates on
-  a later commit; instead `/work` and `/ship` require a clean tree and committed
-  fixes before every (re-)review.
-- **Workflow-level acceptance harness.** Only the helper is unit-tested; the
-  router prose is not driven by an end-to-end scenario suite.
+- **Persistent / cross-session review state.** The `REVIEW_HEAD` guard lives in
+  the coordinator's context, not on disk; a resumed session with no in-context
+  reviewed sha simply re-runs the whole-feature review.
+- **Feature/branch manifest & stacked features.** No on-disk manifest of
+  branch/target-ref, and no stacked-feature semantics. Convention is one feature
+  per branch with a `**Base:**` in the spec; the human keeps them consistent.
+- **Non-linear ticket dependencies.** `Blocked by` is honored, but the helper
+  does not build/validate the graph; work is sequential.
+- **Workflow-level acceptance harness.** Only the helper is unit-tested. In lieu
+  of an end-to-end suite, the seams to smoke-check by hand when the routers change
+  are: invocation from a repo subdirectory, a dirty triage handoff, resume from
+  `in-progress`, a malformed slug/dep id, a rebased/non-ancestor `Base`, a
+  reviewer timeout, a verification failure after review, a scope-changing finding,
+  and final `HEAD` drift before finishing.
+
+Not adopted, recorded for reconsideration: handing the whole ticket set to
+`subagent-driven-development` as one plan (instead of per-ticket primitives)
+could subsume `/work`'s orchestration — but it collapses the per-ticket human
+control and moves finishing inside SDD, which fights the four-verb human-gated
+design; and pinning exact versions of all three required plugins (only a
+Superpowers lower bound is recorded today).
 
 ## Consequences
 

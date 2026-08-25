@@ -79,6 +79,23 @@ check_contains "tickets: excludes requests count" "1/1 done" "$out"
 check_missing  "tickets: excludes requests file"  "99-junk.md" "$out"
 rm -rf "$p"
 
+# tracker paths anchor at the repo root, not the launch subdirectory
+p="$(newp)"; git init -q "$p"; mkdir -p "$p/sub/deeper"
+( cd "$p/sub/deeper" && bash "$SCRIPT" init >/dev/null 2>&1 )
+check "anchor: root has tickets/"      "yes" "$([[ -d "$p/tickets" ]] && echo yes || echo no)"
+check "anchor: subdir has no tickets/" "yes" "$([[ ! -d "$p/sub/deeper/tickets" ]] && echo yes || echo no)"
+rm -rf "$p"
+
+# tickets rejects a slug outside the safe grammar (blocks path traversal / option-like values)
+p="$(newp)"; ( cd "$p" && bash "$SCRIPT" init >/dev/null 2>&1 )
+( cd "$p" && bash "$SCRIPT" tickets "../etc" >/dev/null 2>&1 )
+check "slug: rejects traversal"  "1" "$?"
+( cd "$p" && bash "$SCRIPT" tickets "a/b" >/dev/null 2>&1 )
+check "slug: rejects slash"      "1" "$?"
+( cd "$p" && bash "$SCRIPT" tickets "-rf" >/dev/null 2>&1 )
+check "slug: rejects option-like" "1" "$?"
+rm -rf "$p"
+
 # unknown command -> non-zero
 p="$(newp)"; ( cd "$p" && bash "$SCRIPT" bogus >/dev/null 2>&1 )
 check "unknown command: non-zero" "1" "$?"

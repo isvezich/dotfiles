@@ -22,8 +22,10 @@ logic is inlined below.
 
 1. **Scaffold + branch:** `bash ~/.claude/skills/dev-workflow/scripts/workflow-state.sh init`
    (creates `docs/specs/`, `docs/decisions/`, `tickets/`, `requests/`). Pick one
-   canonical `<slug>` for this feature — the spec is `docs/specs/<slug>.md` and the
-   tickets live in `tickets/<slug>/` (same value; keep them equal). **Record the
+   canonical `<feature-slug>` for this feature — the spec is
+   `docs/specs/<feature-slug>.md` and the tickets live in `tickets/<feature-slug>/`
+   (the same value everywhere, incl. `/work` and `/ship`; keep them equal, and use
+   the `[a-z0-9][a-z0-9-]*` form the helper accepts). **Record the
    fork-point (`<feature-base>`):** capture `git rev-parse HEAD` on the target
    branch *before* creating the feature branch; if you're resuming an existing
    branch, derive it with `git merge-base <target-branch> HEAD` (not `HEAD`, which
@@ -44,7 +46,7 @@ logic is inlined below.
    code, open no external issue, and return to the feature branch. `/feature` has
    not passed its gates yet, so no implementation lands here.
 
-5. **Spec (inline):** synthesize (no re-interview) `docs/specs/<slug>.md` —
+5. **Spec (inline):** synthesize (no re-interview) `docs/specs/<feature-slug>.md` —
    Problem, Solution, User Stories, Implementation Decisions (incl. the test
    seams), Testing Decisions, Out of Scope, and a **`**Base:** <feature-base>`**
    line (the fork-point sha from step 1). **HUMAN GATE ↯ — spec approval.**

@@ -24,23 +24,36 @@ share shell variables).
    partial or uncommitted work.
 
 2. **Whole-feature review** — over the entire branch, not per-ticket: read
-   `**Base:**` from the spec (the `<feature-base>` fork-point), then dispatch
+   `**Base:**` from the spec (the `<feature-base>` fork-point) and **validate it**
+   — `git rev-parse --verify "<feature-base>^{commit}"` and
+   `git merge-base --is-ancestor <feature-base> HEAD`; if it isn't a real ancestor
+   (e.g. after a rebase), stop and return through `/feature`'s spec gate with a
+   human-picked base rather than guessing. Then dispatch
    `superpowers:requesting-code-review` (Claude, with the
-   `~/.claude/skills/dev-workflow/smell-baseline.md` Fowler lens) **and**
-   `reviewers:codex --base <feature-base>` together in one message. This restores
-   cross-ticket coverage and writes the push-gate sentinel for this checkout's
-   `<feature-base>..HEAD` diff (per-ticket sentinels won't match it; the sentinel
-   attests the review ran, it is not bound to the push's refs). A review only
-   counts if **both** reviewers complete over that range — a plugin/network/
-   timeout failure blocks, it is not "no findings." Resolve every blocking
-   finding, committing each fix and confirming a clean tree before re-review; a
-   scope-changing finding sends you back to `/feature`'s **spec** gate (step 5).
+   `~/.claude/skills/dev-workflow/smell-baseline.md` Fowler lens **and** the
+   approved spec + each ticket's acceptance criteria in the brief, so the review
+   checks spec compliance, not just diff defects) **and**
+   `reviewers:codex --base <feature-base>` (an independent defect-finding pass)
+   together in one message. This restores cross-ticket coverage and writes the
+   push-gate sentinel for this checkout's `<feature-base>..HEAD` diff (per-ticket
+   sentinels won't match it; the sentinel attests the review ran, it is not bound
+   to the push's refs). A review only counts if **both** reviewers complete over
+   that range — a plugin/network/timeout failure blocks, it is not "no findings."
+   Resolve every blocking finding, committing each fix and confirming a clean tree
+   before re-review; a scope-changing finding sends you back to `/feature`'s
+   **spec** gate (step 5). When both pass, **note `REVIEW_HEAD` = `git rev-parse
+   HEAD`** (a literal sha held in context).
 
 3. **Fresh verification** — invoke `superpowers:verification-before-completion`:
    run the full suite now and capture the actual output; don't rely on earlier
-   per-ticket runs.
+   per-ticket runs. **If a fix is needed, commit it and return to step 2** — the
+   fix is unreviewed and changes `HEAD`, so re-run the whole-feature review before
+   proceeding.
 
-4. **Finish the branch** — invoke `superpowers:finishing-a-development-branch`:
-   it presents the merge / PR / keep menu. **HUMAN GATE ↯ — the integration
-   choice is the user's.** Outward-facing: no merge/push without their explicit
-   choice; honor the CLAUDE.md refspec rule on any push.
+4. **Finish the branch** — first confirm `git status --porcelain` is empty **and
+   `git rev-parse HEAD` == `REVIEW_HEAD`** (integration must be the exact commit
+   that passed review; if it drifted, go back to step 2). Then invoke
+   `superpowers:finishing-a-development-branch`: it presents the merge / PR / keep
+   menu. **HUMAN GATE ↯ — the integration choice is the user's.** Outward-facing:
+   no merge/push without their explicit choice; honor the CLAUDE.md refspec rule
+   on any push.

@@ -4,6 +4,11 @@
 
 set -uo pipefail
 
+# Anchor every tracker path at the repo root, so launching from a subdirectory
+# can't silently fork the tracker. Outside a git repo, operate in the cwd.
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+[[ -n "$repo_root" ]] && cd "$repo_root"
+
 usage() { echo "usage: workflow-state.sh {init | tickets [feature-slug]}" >&2; }
 
 # Scaffold the tracker: intake (requests/) is separate from execution (tickets/<feature>/).
@@ -16,11 +21,15 @@ cmd_init() {
     echo "workflow: scaffolded docs/specs/, docs/decisions/, tickets/, requests/"
 }
 
-# List one feature's execution tickets (tickets/<slug>/*.md) + a done/total count.
+# List one feature's execution tickets (tickets/<feature-slug>/*.md) + done/total.
 # With no slug: default to the sole feature dir, or error naming the choices; 0/0 if none.
 # Intake (requests/) is never counted.
 cmd_tickets() {
     local slug="${1:-}"
+    if [[ -n "$slug" && ! "$slug" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+        echo "workflow: invalid feature slug '$slug' (allowed: [a-z0-9][a-z0-9-]*)" >&2
+        return 1
+    fi
     if [[ -z "$slug" ]]; then
         local dirs=() d
         shopt -s nullglob

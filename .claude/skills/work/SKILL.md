@@ -49,22 +49,29 @@ ticket 1. `/work` drives the primitives and leaves finishing to `/ship`.
    the same committed range and the codex sentinel matches `HEAD`. Then dispatch
    `superpowers:requesting-code-review` (the public interface — Claude) **and**
    `reviewers:codex --base <BASE>` (cross-model, the literal sha from step 3)
-   together in one message; append `~/.claude/skills/dev-workflow/smell-baseline.md`
-   (Fowler lens) to the Claude reviewer's brief. A review only counts if **both**
-   reviewers complete and return a verdict over that range — a plugin/network/
-   timeout failure blocks progression, it is not "no findings." This is per-ticket
-   fast feedback; the whole-feature review runs in `/ship`.
+   together in one message. Give the Claude reviewer's brief the approved ticket
+   with its acceptance criteria, the relevant spec sections, and
+   `~/.claude/skills/dev-workflow/smell-baseline.md` (Fowler lens) — so it checks
+   spec/ticket compliance, not just diff defects; codex is the independent
+   defect-finding pass. A review only counts if **both** reviewers complete and
+   return a verdict over that range — a plugin/network/timeout failure blocks
+   progression, it is not "no findings." This is per-ticket fast feedback; the
+   whole-feature review runs in `/ship`.
 
 5. **Close only when done** — after both reviews return, every blocking finding
-   is resolved, and `superpowers:verification-before-completion` passes: set
-   `**Status:** done` and **commit that status change** so the terminal state
-   lives on the branch, not just the working tree. **Re-review after any fix:**
-   commit the fix and confirm a clean tree first, then re-run both reviewers over
-   `BASE..HEAD` (an uncommitted fix is invisible to `reviewers:codex --base` and
-   the sentinel). Otherwise leave `in-progress`, or set `blocked` with a reason
-   (also committed). If a finding changes the approved **scope**, stop and re-run
-   `/feature` from the **spec gate** (step 5) — re-approve the spec, then
-   regenerate/re-approve the affected tickets.
+   is resolved, the ticket's **acceptance checkboxes are actually satisfied** (not
+   just its status string), and `superpowers:verification-before-completion`
+   passes: set `**Status:** done` and **commit that status change** so the
+   terminal state lives on the branch, not just the working tree. **Re-review
+   after any fix:** commit the fix and confirm a clean tree first, then re-run
+   both reviewers over `BASE..HEAD` (an uncommitted fix is invisible to
+   `reviewers:codex --base` and the sentinel). Otherwise leave `in-progress`, or
+   set `blocked` with a reason (also committed). If a finding changes the approved
+   **scope**, stop and re-run `/feature` from the **spec gate** (step 5): update
+   and re-approve the spec, then for every ticket the change touches — including
+   ones already `done` — reset `**Status:** ready-for-agent`, regenerate and
+   re-approve its acceptance criteria, and re-run it through `/work`, so nothing
+   ships validated against the superseded scope.
 
 6. **Loop** — repeat from step 2 until
    `bash ~/.claude/skills/dev-workflow/scripts/workflow-state.sh tickets <feature-slug>`
