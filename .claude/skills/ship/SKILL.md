@@ -1,45 +1,41 @@
 ---
 name: ship
 disable-model-invocation: true
-description: Finish a feature — fresh full-suite verification, then present the merge/PR/keep integration menu and clean up the worktree. Thin router over Superpowers verification-before-completion + finishing-a-development-branch. One human gate at the integration choice. Invoke explicitly as /ship.
-when_to_use: When all of a feature's tickets are done and you are ready to verify and integrate. The user runs /ship. Follows /work.
-version: 1.0.0
+description: Finish the active feature — fresh full-suite verification, then the merge/PR/keep integration gate, with state transitions and cleanup conditional on the outcome. Thin router over Superpowers verification-before-completion + finishing-a-development-branch. One human gate. Invoke explicitly as /ship.
+when_to_use: When the active feature's tickets are all done and you're ready to verify and integrate. The user runs /ship. Follows /work.
+version: 2.0.0
 languages: all
 ---
 
-# /ship — verify and integrate
+# /ship — verify and integrate (v2)
 
-Thin router. Shared rules are in `~/.claude/skills/dev-workflow/workflow.md`.
+Router. Shared rules + the v2 state model are in
+`~/.claude/skills/dev-workflow/workflow.md`. `W=~/.claude/skills/dev-workflow/scripts/workflow-state.sh`
 
 ## Steps
 
-1. **Confirm there is a completed feature to ship:**
-   ```bash
-   bash ~/.claude/skills/dev-workflow/scripts/workflow-state.sh tickets
-   ```
-   Require **all three**: the ledger exists with a `feature` in flight, the
-   count is `N/N done`, **and N > 0**. A bare `0/0 done` (no tickets, wrong repo,
-   or failed init) is NOT shippable — stop, there's no feature in flight. If
-   `N/N` but N>0 with some not done, return to `/work`. Only then set
-   `.ai/workflow.yaml` `status: shipping`.
+1. **Confirm a completed feature (active feature only):** `bash $W tickets
+   --feature <slug>` (slug from the ledger). Require **all three**: a `feature`
+   in flight with `status: working`, `N/N done`, **and N > 0**. A bare `0/0`
+   (no feature / wrong repo) is NOT shippable — stop. Some not-done → back to
+   `/work`. Then `bash $W set-status shipping`.
 
-2. **Fresh verification** — invoke `superpowers:verification-before-completion`.
-   No completion claim without fresh evidence: run the full suite now, capture
-   the actual output, do not rely on earlier per-ticket runs.
+2. **Fresh verification** — invoke `superpowers:verification-before-completion`:
+   run the full suite now, capture actual output; don't rely on per-ticket runs.
 
 3. **Finish the branch** — invoke `superpowers:finishing-a-development-branch`:
-   verify tests, detect the environment, and present the integration menu.
-   **HUMAN GATE ↯ — the merge / PR / keep decision is the user's.** Integration
-   is outward-facing; do not merge or push without the user's explicit choice.
-   Honor the CLAUDE.md refspec rule on any push (`git push <remote>
-   <localref>:refs/heads/<remote-branch>`).
+   present the integration menu. **HUMAN GATE ↯ — merge / PR / keep is the
+   user's call.** Outward-facing: no merge/push without their explicit choice.
+   Honor the CLAUDE.md refspec rule on any push.
 
-4. **Clean up + reset state — conditional on the outcome:**
-   - **Merged (branch finished & removed):** clean up the worktree and reset
-     `.ai/workflow.yaml` to `status: idle`, clearing `feature`, `spec`, `branch`,
-     and `current_ticket`. Prune closed-out notes.
-   - **PR opened, or keep-the-branch:** the work is still live — do NOT delete
-     the worktree and do NOT reset to idle. Leave `feature`/`spec`/`branch` set
-     and record `status: pr-open` (PR) or `status: parked` (keep) so a later
-     session can resume. (`finishing-a-development-branch` deliberately preserves
-     the worktree for these; don't undo that.)
+4. **Transition + cleanup — conditional on the outcome:**
+   - **Merged** (branch finished & removed): remove the worktree, then
+     `bash $W set-status idle` and clear the pins/feature:
+     `bash $W set feature null; bash $W set branch null; bash $W set current_ticket null`
+     (`spec_commit`/`tickets_commit`/`manifest` are reset on the next feature's
+     approval). The ledger is in the git-common-dir, so this is checkout-independent.
+   - **PR opened:** `bash $W set-status pr-open` — keep the worktree/branch
+     (finishing-a-development-branch preserves them for PR feedback). Do NOT reset.
+   - **Keep the branch:** `bash $W set-status parked` — keep the worktree/branch.
+   - On a later confirmed external merge of the PR: `bash $W set-status idle` +
+     clear as in the merged case.

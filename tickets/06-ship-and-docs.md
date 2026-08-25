@@ -5,7 +5,7 @@ machine, and bring all docs in line (workflow.md, README, ADR, migration).
 
 **Blocked by:** 02, 05 — needs the helper transitions and the /work flow.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] `/ship` evaluates ONLY the active feature (`tickets --feature <slug>`);
       requires all done + N>0 + `status: working`→`shipping`. Fresh verification.

@@ -7,7 +7,7 @@ blocked/no-frontier.
 **Blocked by:** 02, 03 — needs `check-ready`/pins from the helper and the
 approved manifest from `/feature`.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Start: run `workflow-state.sh check-ready`; refuse to proceed on non-zero
       (unapproved, wrong commit, or digest drift) with the helper's message.

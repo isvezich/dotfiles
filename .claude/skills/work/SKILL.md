@@ -1,71 +1,58 @@
 ---
 name: work
 disable-model-invocation: true
-description: Execute the approved tickets on an isolated branch via Superpowers primitives per ticket (fresh implementer subagent + TDD + a Claude review + cross-model Codex review + verification) — NOT subagent-driven-development, which would finish/merge the branch after the first ticket. Fowler smell baseline as an extra review lens. Runs the tickets autonomously — no human gate between them; finishing is /ship's job. Updates the durable ledger after each. Invoke explicitly as /work.
-when_to_use: When a feature has an approved spec and local tickets and you are ready to implement. The user runs /work. Follows /feature.
-version: 1.0.0
+description: Execute the approved feature's tickets — refusing unapproved or drifted work (check-ready), scoped to that one feature, via Superpowers primitives per ticket (fresh implementer + TDD + a Claude review + cross-model Codex over the pinned BASE..HEAD range + verification), NOT branch-finishing SDD. Terminates (not spins) on blocked/no-frontier. Autonomous between tickets within the approved envelope. Invoke explicitly as /work.
+when_to_use: When a feature is ready-to-work (spec + tickets approved). The user runs /work. Follows /feature.
+version: 2.0.0
 languages: all
 ---
 
-# /work — execute the tickets (autonomous loop)
+# /work — execute the tickets (v2, approval-guarded)
 
-Thin router. Shared rules are in `~/.claude/skills/dev-workflow/workflow.md`.
-This is the one phase with **no human gate between units of work** — it executes
-continuously. Stop only for the four Superpowers stop conditions
-(irreversible/destructive op, security-sensitive action, out-of-worktree side
-effect, or a plan so broken every path is a guess).
+Router. Shared rules + the v2 state model are in
+`~/.claude/skills/dev-workflow/workflow.md`. `W=~/.claude/skills/dev-workflow/scripts/workflow-state.sh`
 
-**Why primitives, not `subagent-driven-development`:** SDD takes the *whole plan*
-and, when that plan completes, runs a final whole-branch review and invokes
-`finishing-a-development-branch`. Handed a single ticket it would treat that
-ticket as the whole plan and trip the merge/PR/keep gate after ticket 1 (and
-`/ship` would then double-finish). So `/work` drives the primitives per ticket
-and leaves finishing to `/ship`.
+**Why primitives, not `subagent-driven-development`:** SDD finishes/merges the
+branch when its plan completes; handed one ticket it would trip the merge gate
+after ticket 1. `/work` drives the primitives and leaves finishing to `/ship`.
 
 ## Steps
 
-1. **Isolate the workspace** — invoke `superpowers:using-git-worktrees` to
-   create/verify an isolated worktree and a clean test baseline. Record the
-   branch in `.ai/workflow.yaml`; set `status: working`.
+1. **Refuse unless approved + un-drifted** — `bash $W check-ready`. On non-zero
+   (not `ready-to-work`, HEAD doesn't descend from the approved `tickets_commit`,
+   or a ticket digest drifted) STOP and surface the message — do not implement
+   unapproved/changed work. Ensure you're on the feature's worktree/branch. Then
+   `bash $W set-status working`.
 
-2. **Pick the next ticket** — the frontier ticket whose "Blocked by" edges are
-   all `done`:
-   ```bash
-   bash ~/.claude/skills/dev-workflow/scripts/workflow-state.sh tickets
-   ```
-   Read the ticket file for its blockers. Set its `**Status:** in-progress` and
-   `current_ticket` in the ledger.
+2. **Pick the next ticket — active feature only** — `bash $W tickets --feature
+   <slug>` (from the ledger; never the inbox or another feature). The frontier
+   ticket is one whose `Blocked by` are all `done`. Set its `**Status:**
+   in-progress` and `bash $W set current_ticket <path>`.
 
-3. **Execute the ticket (primitives, not SDD)** — dispatch a fresh implementer
-   subagent (crafted context, never this session's history) to build just this
-   ticket following `superpowers:test-driven-development` (no production code
-   without a failing test); on breakage it uses `superpowers:systematic-debugging`
-   (root cause before fix) — escalate to architecture review after 3+ failed
-   fixes. Do **not** invoke `superpowers:subagent-driven-development` and do
-   **not** finish the branch here (see the note above — that's `/ship`).
+3. **Execute (primitives)** — capture `BASE=$(git rev-parse HEAD)` first; dispatch
+   a fresh implementer subagent (crafted context) to build just this ticket via
+   `superpowers:test-driven-development` (no code without a failing test); on
+   breakage `superpowers:systematic-debugging`. Commit the ticket's work. Do NOT
+   invoke SDD; do NOT finish the branch.
 
-4. **Independent review — two models, one Claude pass** — the Superpowers task
-   review (Claude) runs on the ticket's diff; per the user's CLAUDE.md, fire
-   `reviewers:codex` (GPT-5.5) alongside it for a cross-model second opinion.
-   Dispatch both in one message so they run concurrently. Only one Claude-side
-   review by design: the Superpowers reviewer is the more rigorous rubric — it
-   treats the implementer's report as unverified, cross-checks named risks
-   outside the diff (lock ordering, API contracts, shared state), and covers
-   tests/security/architecture/production-readiness. A second same-model review
-   would mostly correlate; the extra bug-catching comes from the Codex model.
-   Extra lens: append `~/.claude/skills/dev-workflow/smell-baseline.md` (the
-   Fowler code-smell baseline, grafted from mattpocock's review) to the task
-   reviewer's brief so the one Claude pass also matches the diff against those
-   12 design smells.
+4. **Independent review over the pinned range** — review exactly `BASE..HEAD`:
+   the Superpowers task reviewer (Claude) + `reviewers:codex --base <BASE>`
+   (cross-model), dispatched together; append `~/.claude/skills/dev-workflow/smell-baseline.md`
+   (Fowler lens) to the Claude reviewer's brief.
 
-5. **Close the ticket (only when actually done)** — close ONLY after: both
-   reviews have returned, every blocking finding is resolved (re-review after
-   any fix), and `superpowers:verification-before-completion` passes on the
-   ticket's diff. Then set `**Status:** done`, clear `current_ticket`, prune
-   stale notes. If a review failed/timed out or findings are unresolved, leave
-   `**Status:** in-progress` or set `blocked` with a reason — do not close.
+5. **Close only when done** — after both reviews return, all blocking findings
+   are resolved (re-review after fixes), and `superpowers:verification-before-completion`
+   passes: set `**Status:** done`, `bash $W set current_ticket null`. Otherwise
+   leave `in-progress`, or set `**Status:** blocked` with a reason.
 
-6. **Loop** — return to step 2 until `workflow-state.sh tickets` reports
-   `N/N done`. Do not pause to check in between tickets.
+6. **Renewed gate** — if resolving a finding would change the approved envelope
+   (problem/spec/acceptance/deps/out-of-scope), STOP for a renewed human approval
+   (re-run `/feature`'s ticket gate / re-approve). "No gate between tickets"
+   applies only *within* the approved envelope.
 
-When all tickets are `done`, hand off to `/ship`.
+7. **Terminate, don't spin** — if a ticket is `blocked`, there's no executable
+   frontier, `graph-validate` reports a cycle, or a review times out: `bash $W
+   set-status blocked`, record a durable reason + handoff, and stop.
+
+8. **Loop** — repeat step 2 until `tickets --feature <slug>` is `N/N done`, then
+   hand off to `/ship`. Do not pause between tickets within the envelope.

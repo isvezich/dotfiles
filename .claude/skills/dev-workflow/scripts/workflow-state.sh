@@ -120,6 +120,18 @@ ledger_set() {
 }
 ledger_get() { sed -n "s|^$1:[[:space:]]*||p" "$LEDGER" 2>/dev/null | head -n1; }
 
+cmd_set() {
+    local key="${1:-}" val="${2:-}"
+    [[ -z "$key" ]] && { echo "usage: set <feature|branch|current_ticket|notes> <value>" >&2; return 1; }
+    case "$key" in
+        feature|branch|current_ticket|notes) ;;
+        status) echo "workflow: use set-status (validated transitions) for status" >&2; return 1 ;;
+        *) echo "workflow: refusing to set unknown field '$key'" >&2; return 1 ;;
+    esac
+    [[ -f "$LEDGER" ]] || { echo "workflow: no ledger — run init" >&2; return 1; }
+    ledger_set "$key" "$val"
+}
+
 cmd_approve_spec() {
     local sha="${1:-}"; [[ -z "$sha" ]] && { echo "usage: approve-spec <sha>" >&2; return 1; }
     cmd_set_status spec-approved || return 1
@@ -202,6 +214,7 @@ main() {
         init)       cmd_init ;;
         show)       cmd_show ;;
         set-status) shift; cmd_set_status "$@" ;;
+        set)        shift; cmd_set "$@" ;;
         tickets)    shift; cmd_tickets "$@" ;;
         approve-spec)    shift; cmd_approve_spec "$@" ;;
         approve-tickets) shift; cmd_approve_tickets "$@" ;;

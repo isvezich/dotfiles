@@ -5,7 +5,7 @@ triage state vocabulary, separate from feature execution.
 
 **Blocked by:** 01 — uses the helper's inbox namespace + states.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Intake items are `tickets/inbox/<id>.md`; states `needs-triage`,
       `needs-info`, `ready-for-human`, `wontfix`, `ready-for-feature`.

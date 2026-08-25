@@ -6,7 +6,7 @@ at each gate, and records the commit-pins via the helper.
 
 **Blocked by:** 02 — uses approve-spec / approve-tickets / graph-validate.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Step 1: create the feature branch + worktree
       (`superpowers:using-git-worktrees`) BEFORE any artifact; `cd` there; ledger

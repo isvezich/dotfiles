@@ -22,6 +22,7 @@ The `triage`/`feature`/`work` routers invoke skills from two more plugins — in
 
 ```
 /plugin install mattpocock-skills@claude-plugins-official   # grilling, domain-modeling, research, prototype, codebase-design
+/plugin marketplace add https://github.netflix.net/corp/gni-skills.git   # gni-skills isn't built in
 /plugin install reviewers@gni-skills                        # reviewers:codex (the /work review), + the codex push gate
 ```
 
@@ -76,19 +77,22 @@ the tuned upstream skills in order and stop at human gates; they do not
 reimplement upstream content.
 
 ```
-/triage   → decide what to build        (skip if no inbound queue)
-/feature  → design + break down work     approve spec, then approve tickets
-/work     → execute all tickets          autonomous — no gate between tickets
-/ship     → verify + integrate           choose merge / PR / keep
+/triage   → work the inbox queue         (skip if no queue)
+/feature  → branch+worktree, design       approve spec, then approve tickets (commit-pinned)
+/work     → execute the feature           autonomous within the approved envelope
+/ship     → verify + integrate            choose merge / PR / keep
 ```
 
 `dev-workflow/` holds the shared reference (`workflow.md`, the single source of
-truth) and `scripts/workflow-state.sh`, which scaffolds and reads a project's
-**local-only** tracker. All triage/specs/tickets are local files in the project
-repo — never GitHub Issues or Jira. Per project, the loop uses `CONTEXT.md`,
-`docs/specs/`, `docs/decisions/` (ADRs), `tickets/`, and `.ai/workflow.yaml`
-(the durable ledger / recovery map). Run
-`workflow-state.sh init` in a project to scaffold that layout. Tests:
+truth — read it for the full v2 model + [ADR](docs/decisions/0001-dev-workflow-v2.md))
+and `scripts/workflow-state.sh`, a **validated state machine**. All
+triage/specs/tickets are local files (never GitHub/Jira). Layout: intake in
+`tickets/inbox/`, an approved feature's tickets in `tickets/features/<slug>/`,
+`docs/specs/` + `docs/decisions/`, `CONTEXT.md`, and the **ledger in the
+git-common-dir** (`$(git rev-parse --git-common-dir)/dev-workflow/state.yaml`, so
+all worktrees share one copy). `/feature` creates a branch+worktree first and
+commit-pins each approval; `/work` refuses drifted/unapproved work. One active
+feature per repo. Run `workflow-state.sh init` to scaffold. Tests:
 `bash tests/dev-workflow/test.sh`.
 
 ### Helper scripts: symlink from ~/bin
@@ -143,7 +147,7 @@ Wired **globally** in `~/.claude/settings.json` (every repo, not per-project):
 }
 ```
 
-Requirements: `uv`, `python3`, and network on first use (the gate parses bash via `bashlex`; `uv` caches it after). Satisfy the gate with `/reviewers:codex --base <branch>` (or `--commit HEAD`, `--uncommitted`); only the bug-finding pass writes the sentinel, not the advisory design pass. The `reviewers` plugin must be installed (`/plugin install reviewers@gni-skills`).
+Requirements: `uv`, `python3`, and network on first use (the gate parses bash via `bashlex`; `uv` caches it after). Satisfy the gate with `/reviewers:codex --base <upstream>` for a branch push — **use `--base`, not `--commit HEAD`**: `--commit HEAD` reviews only the tip, so a multi-commit push can send earlier unreviewed commits and still match the sentinel. Only the bug-finding pass writes the sentinel, not the advisory design pass. The `reviewers` plugin must be installed (see the required-plugins section, incl. the `gni-skills` marketplace).
 
 ### Optional: bash behavior-nudge hooks
 

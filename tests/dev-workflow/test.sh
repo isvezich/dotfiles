@@ -143,5 +143,14 @@ wf "$proj" "$sd" graph-validate "$slug" >/dev/null 2>&1
 check "graph-validate: no frontier fails" "1" "$?"
 rm -rf "$proj" "$sd"
 
+# set: records non-status fields; refuses status
+proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
+wf "$proj" "$sd" set feature demo >/dev/null 2>&1
+check "set: records feature" "0" "$?"
+check_contains "set: feature persisted" "feature: demo" "$(cat "$sd/state.yaml")"
+wf "$proj" "$sd" set status working >/dev/null 2>&1
+check "set: refuses status (must use set-status)" "1" "$?"
+rm -rf "$proj" "$sd"
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]
