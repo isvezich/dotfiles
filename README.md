@@ -87,12 +87,17 @@ They are **human-driven checklists**, deliberately not a state machine (a robust
 state-machine attempt was abandoned as over-engineered — see
 [ADR 0001](docs/decisions/0001-dev-workflow-simple.md)). `dev-workflow/` holds the
 shared reference (`workflow.md`) and a trivial `scripts/workflow-state.sh` that
-only scaffolds and lists (`init`, `tickets`). All triage/specs/tickets are local
-files (never GitHub/Jira): flat `tickets/<NN>-<slug>.md` (with a `**Status:**`
-line), `docs/specs/`, `docs/decisions/`, `CONTEXT.md`. No ledger, no
-commit-pinning, no transactions — the human drives the gates. `/work`'s value is
-the dual-model review (Superpowers + `reviewers:codex` + the Fowler smell lens).
-Run `workflow-state.sh init` to scaffold. Tests: `bash tests/dev-workflow/test.sh`.
+only scaffolds and lists (`init`, `tickets [feature-slug]`). All
+triage/specs/tickets are local files (never GitHub/Jira), with intake kept
+separate from execution: triage records in `requests/`, execution tickets in
+per-feature `tickets/<feature-slug>/<NN>-<slug>.md` (each with a `**Status:**`
+line), plus `docs/specs/` (each spec carries a `**Base:**` fork-point line),
+`docs/decisions/`, `CONTEXT.md`. These are coordination identifiers, not a
+transactional state machine: no ledger, no commit-pinning — the human drives the
+gates. `/work` reviews each ticket and `/ship` reviews the whole branch, both
+dual-model (Superpowers `requesting-code-review` + `reviewers:codex` + the Fowler
+smell lens). Run `workflow-state.sh init` to scaffold. Tests:
+`bash tests/dev-workflow/test.sh`.
 
 ### Helper scripts: symlink from ~/bin
 

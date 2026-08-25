@@ -20,33 +20,50 @@ or generation directories, a formal input grammar with path canonicalization).
 
 ## Decision
 
-**Keep the workflow a simple, human-driven checklist over a flat local tracker.**
+**Keep the workflow human-driven checklists — plus the smallest set of
+coordination identifiers a multi-ticket happy path actually needs — but NOT a
+state machine.** The rejected middle ground the first draft skipped is adopted
+here: it is coordination metadata, not transactional machinery.
 - The routers are checklists a human drives through explicit gates; they invoke
-  the tuned upstream skills (and inline the user-only Matt Pocock ones).
-- The tracker is flat `tickets/<NN>-<slug>.md` (with a `**Status:**` line) plus
-  `docs/specs/` and `docs/decisions/`. The helper does only `init` (scaffold) and
-  `tickets` (list + done/total).
-- No ledger, no commit-pinning, no approval digests, no transactional state
-  machine, no worktree-first ceremony, no per-feature namespaces.
+  the tuned upstream skills (and inline the user-only Matt Pocock ones). Reviews
+  go through the public `superpowers:requesting-code-review` interface.
+- Intake is separate from execution: triage records in `requests/`, execution
+  tickets in per-feature `tickets/<feature-slug>/`, so a deferred/rejected
+  request never blocks a feature's `done/total` and ids can't collide across
+  features.
+- One provenance line — `**Base:** <fork-point>` in the spec — lets `/work`
+  review per ticket and `/ship` review the **whole branch** (and produce the
+  push-gate sentinel for the full outgoing diff).
+- The helper still does only `init` (scaffold, incl. `requests/`) and
+  `tickets [feature-slug]` (list + done/total for one feature).
+- Still **no** ledger, commit-pinning, approval digests, transactional lifecycle
+  commands, worktree-first ceremony, or dependency-graph validator.
 
 ## Rationale
 
-- **YAGNI.** For a solo workflow the enforced-integrity properties (crash
-  recovery, tamper-evident approval, multi-feature isolation) are rarely
-  exercised and never worth a crash-consistent bash state machine.
-- **Non-convergence.** Six review rounds did not converge — each layer of
-  machinery added surface for the next round. A checklist has almost no such
-  surface: the whole class of state-machine bugs (ledger corruption,
-  digest/status contradictions, illegal transitions, TOCTOU) simply does not
-  exist.
-- **The value was never the state machine** — it's the *gates* and the *dual-model
-  review* in `/work`. Those are preserved.
+- **YAGNI, bounded.** For a solo workflow the enforced-integrity properties
+  (crash recovery, tamper-evident approval) are never worth a crash-consistent
+  bash state machine. But *some* structure — scoped intake, per-feature ids, a
+  base ref — is needed for the plain multi-ticket path to work at all; the first
+  radical cut removed too much and the happy path couldn't compose.
+- **Non-convergence of the machine, not of the need.** Six review rounds of the
+  *state machine* did not converge — each layer added surface for the next. The
+  checklist has almost no such surface. It does **not** make correctness free:
+  humans and concurrent file edits can still produce contradictory statuses,
+  stale dependencies, or work against a changed spec. The design accepts those
+  risks rather than automating them away.
+- **The value was never the state machine** — it's the *gates* and the
+  *dual-model review*. Those are preserved and, in `/ship`, extended to the whole
+  feature.
 
 ## Consequences
 
-- The workflow enforces nothing; the human drives the gates and owns integrity.
+- The workflow enforces nothing; the human drives the gates and owns status and
+  commit integrity by hand.
 - Superseded and removed: the v2 spec (`docs/specs/dev-workflow-v2.md`), the v2
   ADR, and the v3 redesign tickets.
 - The dogfooding exercise's real payoff stands on its own: the cross-model review
-  caught defects the same-model reviews repeatedly missed — the strongest reason
-  to keep `reviewers:codex` in the `/work` panel.
+  caught defects the same-model reviews repeatedly missed — including the flat
+  tracker's intake/execution conflation and a broken helper reference in this
+  very simplification — the strongest reason to keep `reviewers:codex` in the
+  review panel.

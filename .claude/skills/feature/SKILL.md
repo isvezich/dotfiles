@@ -1,7 +1,7 @@
 ---
 name: feature
 disable-model-invocation: true
-description: Start an approved feature — design it (grilling/domain-modeling), then write a local spec and break it into local tickets. A human-driven checklist over a flat local tracker (no state machine). Two human gates. Invoke explicitly as /feature.
+description: Start an approved feature — design it (grilling/domain-modeling), then write a local spec and break it into local per-feature tickets. A human-driven checklist over a local tracker (no state machine). Two human gates. Invoke explicitly as /feature.
 when_to_use: When starting a new, approved piece of work and you need a design, spec, and ticket breakdown before implementation. The user runs /feature. Follows /triage, or is the intake for solo idea-driven work.
 version: 3.0.0
 languages: all
@@ -11,7 +11,7 @@ languages: all
 
 A human-driven checklist. Shared rules are in
 `~/.claude/skills/dev-workflow/workflow.md`. This is deliberately NOT a state
-machine — you drive it; the flat tracker just holds artifacts.
+machine — you drive it; the local tracker just holds artifacts.
 
 **Invocability:** a router can only invoke *model-invocable* skills — `grilling`,
 `domain-modeling`, `research`, `prototype`, `codebase-design`. Matt's
@@ -20,9 +20,11 @@ logic is inlined below.
 
 ## Steps
 
-1. **Scaffold:** `bash ~/.claude/skills/dev-workflow/scripts/workflow-state.sh init`
-   (creates `docs/specs/`, `docs/decisions/`, `tickets/`). Work on a feature
-   branch (create one if you're on the default branch).
+1. **Scaffold + branch:** `bash ~/.claude/skills/dev-workflow/scripts/workflow-state.sh init`
+   (creates `docs/specs/`, `docs/decisions/`, `tickets/`, `requests/`). Create/switch
+   to a feature branch. **Record the fork-point now:** `git rev-parse HEAD` on the
+   base branch is the feature's `<feature-base>` — you'll write it into the spec in
+   step 5 and `/work`+`/ship` review against it.
 
 2. **Classify + frame** (inline): spike / bounded / architectural — say which,
    and don't implement before the gates below. (Consult `superpowers:brainstorming`'s
@@ -36,10 +38,12 @@ logic is inlined below.
 
 5. **Spec (inline):** synthesize (no re-interview) `docs/specs/<slug>.md` —
    Problem, Solution, User Stories, Implementation Decisions (incl. the test
-   seams), Testing Decisions, Out of Scope. **HUMAN GATE ↯ — spec approval.**
+   seams), Testing Decisions, Out of Scope, and a **`**Base:** <feature-base>`**
+   line (the fork-point sha from step 1). **HUMAN GATE ↯ — spec approval.**
 
 6. **Tickets (inline):** break the spec into tracer-bullet vertical slices at
-   `tickets/<NN>-<slug>.md`, in dependency order (blockers first), each with
+   `tickets/<feature-slug>/<NN>-<slug>.md` (one dir per feature — ids never
+   collide across features), in dependency order (blockers first), each with
    `**What to build:**`, `**Blocked by:**` (ids or None), `**Status:**
    ready-for-agent`, and acceptance checkboxes. **HUMAN GATE ↯ — ticket approval.**
 

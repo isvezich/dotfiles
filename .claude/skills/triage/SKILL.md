@@ -9,7 +9,9 @@ languages: all
 
 # /triage — decide what to build
 
-A human-driven checklist over the flat local `tickets/` (never GitHub/Jira).
+A human-driven checklist over the local **intake** dir `requests/` (never
+GitHub/Jira). Execution tickets live elsewhere (`tickets/<feature-slug>/`, owned
+by `/feature`) so a deferred/rejected request never blocks a feature's count.
 Shared rules: `~/.claude/skills/dev-workflow/workflow.md`.
 
 ## Steps
@@ -22,13 +24,17 @@ Shared rules: `~/.claude/skills/dev-workflow/workflow.md`.
    - Redundancy / prior-rejection: search the codebase by domain concept, read
      `docs/decisions/` ADRs; if already implemented → `wontfix`.
    - Verify the claim where you can (reproduce a bug).
-   - Decide a status for the ticket: `ready-for-agent` | `needs-info` |
-     `ready-for-human` | `wontfix`.
+   - Decide an intake status: `needs-info` | `ready-for-human` | `wontfix` (or
+     *adopt* — see step 4). Synthesize your own summary; don't forward the
+     inbound text verbatim.
    - If it needs shaping, invoke `mattpocock-skills:grilling` +
      `mattpocock-skills:domain-modeling`, or hand to `/feature`.
 
 3. **HUMAN GATE ↯** — present your category + status recommendation; the
-   maintainer directs. Record the outcome as a `tickets/<id>.md` with a
+   maintainer directs. Record the outcome as `requests/<id>.md` with a
    `**Status:**` line.
 
-Adopting an item for build → hand off to `/feature`.
+4. **Adopt for build** → hand off to `/feature` (which creates
+   `tickets/<feature-slug>/`). Mark the `requests/<id>.md` `**Status:**
+   ready-for-human` with a pointer to the feature slug, so the intake record is
+   closed out rather than left dangling.
