@@ -1,7 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(/Users/svezich/.claude/skills/grip-review/serve.sh *)"
+      "Bash($HOME/.claude/skills/grip-review/serve.sh *)"
     ]
   },
   "hooks": {
@@ -10,7 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/svezich/.claude/hooks/cleanup-grip.sh"
+            "command": "$HOME/.claude/hooks/cleanup-grip.sh"
           }
         ]
       }

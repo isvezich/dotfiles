@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/svezich/.claude/hooks/enforce-subagent-model.py"
+            "command": "$HOME/.claude/hooks/enforce-subagent-model.py"
           }
         ]
       },
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/svezich/.claude/hooks/enforce-subagent-model.py"
+            "command": "$HOME/.claude/hooks/enforce-subagent-model.py"
           }
         ]
       },
@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/svezich/.claude/hooks/enforce-subagent-model.py"
+            "command": "$HOME/.claude/hooks/enforce-subagent-model.py"
           }
         ]
       }

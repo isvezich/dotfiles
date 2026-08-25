@@ -6,12 +6,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/svezich/.claude/hooks/block-git-dash-c.py",
+            "command": "$HOME/.claude/hooks/block-git-dash-c.py",
             "if": "Bash(git *)"
           },
           {
             "type": "command",
-            "command": "/Users/svezich/.claude/hooks/block-git-dash-c.py",
+            "command": "$HOME/.claude/hooks/block-git-dash-c.py",
             "if": "Bash(cd *)"
           }
         ]

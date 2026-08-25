@@ -6,22 +6,22 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/svezich/.claude/hooks/read-write-edit-block.py",
+            "command": "$HOME/.claude/hooks/read-write-edit-block.py",
             "if": "Bash(cat *)"
           },
           {
             "type": "command",
-            "command": "/Users/svezich/.claude/hooks/read-write-edit-block.py",
+            "command": "$HOME/.claude/hooks/read-write-edit-block.py",
             "if": "Bash(head *)"
           },
           {
             "type": "command",
-            "command": "/Users/svezich/.claude/hooks/read-write-edit-block.py",
+            "command": "$HOME/.claude/hooks/read-write-edit-block.py",
             "if": "Bash(sed *)"
           },
           {
             "type": "command",
-            "command": "/Users/svezich/.claude/hooks/read-write-edit-block.py",
+            "command": "$HOME/.claude/hooks/read-write-edit-block.py",
             "if": "Bash(echo *)"
           }
         ]

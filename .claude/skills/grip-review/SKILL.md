@@ -29,7 +29,7 @@ Do NOT invoke for arbitrary markdown files unrelated to superpowers reviews. Do 
 Run the helper with the absolute path to the markdown file:
 
 ```bash
-/Users/svezich/.claude/skills/grip-review/serve.sh /absolute/path/to/file.md
+$HOME/.claude/skills/grip-review/serve.sh /absolute/path/to/file.md
 ```
 
 The script prints a single URL to stdout on success (e.g. `http://<lan-ip>:6531/path/to/file.md`). Pipe that URL into your review prompt to the user, e.g.:
