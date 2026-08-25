@@ -1,114 +1,91 @@
 #!/usr/bin/env bash
-# ABOUTME: Tests for dev-workflow/scripts/workflow-state.sh — init, show, tickets.
-# ABOUTME: Runs each case in a throwaway project dir; no external deps (no yq/bats).
+# ABOUTME: Tests for dev-workflow/scripts/workflow-state.sh (v2 state machine).
+# ABOUTME: Throwaway git repos; ledger redirected via WORKFLOW_STATE_DIR. No external deps.
 
 set -uo pipefail
 
 SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.claude/skills/dev-workflow/scripts" && pwd)/workflow-state.sh"
 
-pass=0
-fail=0
+pass=0; fail=0
+check() { local d="$1" e="$2" a="$3"; if [[ "$a" == "$e" ]]; then pass=$((pass+1)); else
+    fail=$((fail+1)); printf 'FAIL: %s\n  expected: %q\n  actual:   %q\n' "$d" "$e" "$a"; fi; }
+check_contains() { local d="$1" n="$2" h="$3"; if [[ "$h" == *"$n"* ]]; then pass=$((pass+1)); else
+    fail=$((fail+1)); printf 'FAIL: %s\n  want-contains: %q\n  actual: %q\n' "$d" "$n" "$h"; fi; }
 
-check() {
-    # check <description> <expected> <actual>
-    local desc="$1" expected="$2" actual="$3"
-    if [[ "$actual" == "$expected" ]]; then
-        pass=$((pass + 1))
-    else
-        fail=$((fail + 1))
-        printf 'FAIL: %s\n  expected: %q\n  actual:   %q\n' "$desc" "$expected" "$actual"
-    fi
-}
-
-check_contains() {
-    # check_contains <description> <needle> <haystack>
-    local desc="$1" needle="$2" haystack="$3"
-    if [[ "$haystack" == *"$needle"* ]]; then
-        pass=$((pass + 1))
-    else
-        fail=$((fail + 1))
-        printf 'FAIL: %s\n  expected to contain: %q\n  actual: %q\n' "$desc" "$needle" "$haystack"
-    fi
-}
-
-new_project() {
-    local d
-    d="$(mktemp -d)"
+# A throwaway git repo. Prints its path.
+new_repo() {
+    local d; d="$(mktemp -d)"
+    ( cd "$d" && git init -q && git config user.email t@t && git config user.name t &&
+      printf 'a\n' > f && git add f && git commit -qm c1 )
     printf '%s' "$d"
 }
+# run the helper in repo $1 with the ledger redirected to a temp state dir $2
+wf() { ( cd "$1" && WORKFLOW_STATE_DIR="$2" bash "$SCRIPT" "${@:3}" ); }
 
-# --- init: creates the local-tracker layout and a starter state file ---
-proj="$(new_project)"
+# ── init: creates ledger (in the state dir) + inbox/ + features/ ─────────────
+proj="$(new_repo)"; sd="$(mktemp -d)"
+wf "$proj" "$sd" init >/dev/null 2>&1
+check "init: ledger created in state dir"  "yes" "$([[ -f "$sd/state.yaml" ]] && echo yes || echo no)"
+check "init: tickets/inbox created"        "yes" "$([[ -d "$proj/tickets/inbox" ]] && echo yes || echo no)"
+check "init: tickets/features created"     "yes" "$([[ -d "$proj/tickets/features" ]] && echo yes || echo no)"
+check_contains "init: ledger starts idle"  "status: idle" "$(cat "$sd/state.yaml")"
+rm -rf "$proj" "$sd"
+
+# default ledger location is the git-common-dir (WORKFLOW_STATE_DIR unset)
+proj="$(new_repo)"
 ( cd "$proj" && bash "$SCRIPT" init >/dev/null 2>&1 )
-check "init creates docs/specs"     "yes" "$([[ -d "$proj/docs/specs" ]] && echo yes || echo no)"
-check "init creates docs/decisions" "yes" "$([[ -d "$proj/docs/decisions" ]] && echo yes || echo no)"
-check "init creates tickets"        "yes" "$([[ -d "$proj/tickets" ]] && echo yes || echo no)"
-check "init creates .ai/workflow.yaml" "yes" "$([[ -f "$proj/.ai/workflow.yaml" ]] && echo yes || echo no)"
-check_contains "starter state file carries ABOUTME" "ABOUTME:" "$(cat "$proj/.ai/workflow.yaml")"
-check_contains "starter state file has status field" "status:" "$(cat "$proj/.ai/workflow.yaml")"
+gcd="$( cd "$proj" && git rev-parse --git-common-dir )"
+check "init: default ledger under git-common-dir" "yes" "$([[ -f "$proj/$gcd/dev-workflow/state.yaml" || -f "$gcd/dev-workflow/state.yaml" ]] && echo yes || echo no)"
 rm -rf "$proj"
 
-# --- init: idempotent, never clobbers an existing state file ---
-proj="$(new_project)"
-( cd "$proj" && bash "$SCRIPT" init >/dev/null 2>&1 )
-printf 'feature: my-sentinel\n' > "$proj/.ai/workflow.yaml"
-( cd "$proj" && bash "$SCRIPT" init >/dev/null 2>&1 )
-check "second init preserves existing state file" "feature: my-sentinel" "$(cat "$proj/.ai/workflow.yaml")"
-rm -rf "$proj"
+# init fails closed when a scaffold path collides with a file
+proj="$(new_repo)"; sd="$(mktemp -d)"
+: > "$proj/tickets"   # 'tickets' is a file -> mkdir tickets/inbox must fail
+wf "$proj" "$sd" init >/dev/null 2>&1
+check "init: fails closed on collision" "1" "$?"
+rm -rf "$proj" "$sd"
 
-# --- init: fails closed (non-zero) when a scaffold path collides with a file ---
-proj="$(new_project)"
-: > "$proj/docs"   # 'docs' is a file, so `mkdir -p docs/specs` must fail
-( cd "$proj" && bash "$SCRIPT" init >/dev/null 2>&1 )
-check "init fails closed on path collision" "1" "$?"
-rm -rf "$proj"
+# ── show ────────────────────────────────────────────────────────────────────
+proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
+check_contains "show: prints ledger" "status:" "$(wf "$proj" "$sd" show 2>/dev/null)"
+rm -rf "$proj" "$sd"
+proj="$(new_repo)"; sd="$(mktemp -d)"
+wf "$proj" "$sd" show >/dev/null 2>&1
+check "show: errors when absent" "1" "$?"
+rm -rf "$proj" "$sd"
 
-# --- show: prints the state file; errors when absent ---
-proj="$(new_project)"
-( cd "$proj" && bash "$SCRIPT" init >/dev/null 2>&1 )
-show_out="$( cd "$proj" && bash "$SCRIPT" show 2>/dev/null )"
-check_contains "show prints the state file" "status:" "$show_out"
-rm -rf "$proj"
+# ── set-status: legal transitions succeed, illegal are rejected ──────────────
+proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
+wf "$proj" "$sd" set-status triaging >/dev/null 2>&1
+check "set-status: idle->triaging ok" "0" "$?"
+check_contains "set-status: persisted" "status: triaging" "$(cat "$sd/state.yaml")"
+wf "$proj" "$sd" set-status working >/dev/null 2>&1   # illegal from triaging
+check "set-status: illegal transition rejected" "1" "$?"
+check_contains "set-status: status unchanged after illegal" "status: triaging" "$(cat "$sd/state.yaml")"
+# a full legal path
+for s in designing spec-approved ready-to-work working shipping idle; do
+    wf "$proj" "$sd" set-status "$s" >/dev/null 2>&1 || { echo "FAIL: legal set-status $s rejected"; fail=$((fail+1)); }
+done
+check "set-status: walked the legal path to idle" "status: idle" "$(grep '^status:' "$sd/state.yaml")"
+rm -rf "$proj" "$sd"
 
-proj="$(new_project)"
-( cd "$proj" && bash "$SCRIPT" show >/dev/null 2>&1 )
-check "show without state file exits non-zero" "1" "$?"
-rm -rf "$proj"
+# ── tickets --feature: counts only that feature's execution tickets ──────────
+proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
+mkdir -p "$proj/tickets/features/foo" "$proj/tickets/features/bar" "$proj/tickets/inbox"
+printf '**Status:** done\n'            > "$proj/tickets/features/foo/01-a.md"
+printf '**Status:** in-progress\n'     > "$proj/tickets/features/foo/02-b.md"
+printf '**Status:** wontfix\n'         > "$proj/tickets/inbox/x.md"          # inbox: ignored
+printf '**Status:** done\n'            > "$proj/tickets/features/bar/01-c.md" # other feature: ignored
+out="$(wf "$proj" "$sd" tickets --feature foo 2>/dev/null)"
+check_contains "tickets --feature: lists foo/01 done"        "01-a.md"$'\t'"done" "$out"
+check_contains "tickets --feature: counts only foo (1/2)"    "1/2 done" "$out"
+rm -rf "$proj" "$sd"
 
-# --- tickets: lists each ticket with its parsed status + a done/total summary ---
-proj="$(new_project)"
-( cd "$proj" && bash "$SCRIPT" init >/dev/null 2>&1 )
-cat > "$proj/tickets/01-first.md" <<'EOF'
-# 01 — First
-**Status:** done
-EOF
-cat > "$proj/tickets/02-second.md" <<'EOF'
-# 02 — Second
-**Status:** ready-for-agent
-EOF
-cat > "$proj/tickets/03-third.md" <<'EOF'
-# 03 — Third
-(no status line here)
-EOF
-tickets_out="$( cd "$proj" && bash "$SCRIPT" tickets 2>/dev/null )"
-check_contains "tickets lists first with done"        "01-first.md"$'\t'"done" "$tickets_out"
-check_contains "tickets lists second as ready"        "02-second.md"$'\t'"ready-for-agent" "$tickets_out"
-check_contains "tickets marks missing status unknown" "03-third.md"$'\t'"unknown" "$tickets_out"
-check_contains "tickets prints done/total summary"    "1/3 done" "$tickets_out"
-rm -rf "$proj"
-
-# --- tickets: empty tracker reports 0/0 ---
-proj="$(new_project)"
-( cd "$proj" && bash "$SCRIPT" init >/dev/null 2>&1 )
-tickets_out="$( cd "$proj" && bash "$SCRIPT" tickets 2>/dev/null )"
-check_contains "empty tracker reports 0/0 done" "0/0 done" "$tickets_out"
-rm -rf "$proj"
-
-# --- unknown command exits non-zero ---
-proj="$(new_project)"
-( cd "$proj" && bash "$SCRIPT" bogus >/dev/null 2>&1 )
-check "unknown command exits non-zero" "1" "$?"
-rm -rf "$proj"
+# unknown command -> non-zero
+proj="$(new_repo)"; sd="$(mktemp -d)"
+wf "$proj" "$sd" bogus >/dev/null 2>&1
+check "unknown command: non-zero" "1" "$?"
+rm -rf "$proj" "$sd"
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]
