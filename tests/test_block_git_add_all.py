@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 HOOK = Path(__file__).resolve().parent.parent / ".claude" / "hooks" / "block-git-add-all.py"
-CWD = "/home/achen/git/gh/dotfiles"
+CWD = str(Path(__file__).resolve().parent.parent)
 
 
 def run_raw(stdin: str) -> tuple[int, str]:

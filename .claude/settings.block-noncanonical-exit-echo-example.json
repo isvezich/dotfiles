@@ -11,7 +11,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/achen/.claude/hooks/block-noncanonical-exit-echo.py"
+            "command": "/Users/svezich/.claude/hooks/block-noncanonical-exit-echo.py"
           }
         ]
       }

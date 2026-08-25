@@ -13,7 +13,7 @@ HOOK = (
     / "hooks"
     / "block-noncanonical-exit-echo.py"
 )
-CWD = "/home/achen/git/gh/dotfiles"
+CWD = str(Path(__file__).resolve().parent.parent)
 
 
 def run(cmd: str, tool: str = "Bash") -> tuple[int, str]:

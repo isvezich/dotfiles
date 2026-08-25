@@ -98,7 +98,7 @@ DENY_ROOT = (
     "non-root --user in docker's own options. Re-run as yourself with "
     "`--user $(id -u):$(id -g)`, or pass `--user <uid>` with a non-zero NUMERIC "
     "uid (a username is not accepted -- a name can map to uid 0). If it "
-    "genuinely needs root, do NOT run it -- print the exact command for Andrew "
+    "genuinely needs root, do NOT run it -- print the exact command for the user "
     "to run manually."
 )
 
