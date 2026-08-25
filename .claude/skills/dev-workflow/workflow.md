@@ -51,11 +51,24 @@ ready-to-work → working → shipping → {idle(merged), pr-open, parked}
 pr-open → idle        parked → working        working → blocked → working
 ```
 
-**Commit-pinned approval:** the spec gate commits the spec and records
-`spec_commit`; the ticket gate commits tickets and records `tickets_commit` + a
-manifest of `path→sha256`. `/work` runs `check-ready` and refuses unless
-`status: ready-to-work`, HEAD descends from `tickets_commit`, and no ticket
-digest drifted. Drift ⇒ re-approve.
+**Commit-pinned approval + closed bundle:** the spec gate commits the spec/ADRs
+and records `spec_commit` + a spec manifest of `path→sha256`; the ticket gate
+commits tickets and records `tickets_commit` + a ticket manifest (built fully,
+then published with `ready-to-work` written LAST). `check-ready` refuses unless
+`status: ready-to-work`, HEAD descends from `tickets_commit`, on the recorded
+`branch`, no spec/ticket digest drifted, AND the feature dir has **no ticket
+outside the manifest** (closed set). Drift/extra ⇒ re-approve.
+
+**Execution status is out of the hashed artifact.** Ticket files carry NO
+`Status:` line — execution status lives in the ledger's status map (`set-ticket
+<path> <status>`), so approval digests stay stable and a feature can **`resume`**
+(revalidate the immutable bundle + branch, from `working`/`blocked`/`parked`)
+after an interruption.
+
+**Atomic lifecycle commands** (each rewrites the ledger in one pass, rejecting
+illegal source states): `start-feature <slug> <branch>` (idle/triaging→designing
++ record feature/branch), `approve-spec`, `approve-tickets`, `resume`,
+`finish <merged|pr|keep>`, `cancel`. Prefer these over ad-hoc `set` sequences.
 
 ## Reconciliation (which source wins)
 

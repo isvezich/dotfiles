@@ -72,10 +72,10 @@ rm -rf "$proj" "$sd"
 # ── tickets --feature: counts only that feature's execution tickets ──────────
 proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
 mkdir -p "$proj/tickets/features/foo" "$proj/tickets/features/bar" "$proj/tickets/inbox"
-printf '**Status:** done\n'            > "$proj/tickets/features/foo/01-a.md"
-printf '**Status:** in-progress\n'     > "$proj/tickets/features/foo/02-b.md"
-printf '**Status:** wontfix\n'         > "$proj/tickets/inbox/x.md"          # inbox: ignored
-printf '**Status:** done\n'            > "$proj/tickets/features/bar/01-c.md" # other feature: ignored
+: > "$proj/tickets/features/foo/01-a.md"; : > "$proj/tickets/features/foo/02-b.md"
+: > "$proj/tickets/inbox/x.md"; : > "$proj/tickets/features/bar/01-c.md"
+wf "$proj" "$sd" set-ticket "tickets/features/foo/01-a.md" done >/dev/null 2>&1        # status via the map
+wf "$proj" "$sd" set-ticket "tickets/features/foo/02-b.md" in-progress >/dev/null 2>&1
 out="$(wf "$proj" "$sd" tickets --feature foo 2>/dev/null)"
 check_contains "tickets --feature: lists foo/01 done"        "01-a.md"$'\t'"done" "$out"
 check_contains "tickets --feature: counts only foo (1/2)"    "1/2 done" "$out"
@@ -90,19 +90,21 @@ rm -rf "$proj" "$sd"
 # ── Ticket 02: approval pins, check-ready, graph-validate ────────────────────
 
 # helper: a repo mid-feature with committed tickets on a feature branch
-feature_repo() {  # -> prints "proj sd slug"
-    local proj sd slug=demo; proj="$(new_repo)"; sd="$(mktemp -d)"
-    ( cd "$proj" && WORKFLOW_STATE_DIR="$sd" bash "$SCRIPT" init >/dev/null 2>&1
+feature_repo() {  # -> prints "proj sd slug"; ledger already at 'designing' via start-feature
+    local proj sd slug=demo br; proj="$(new_repo)"; sd="$(mktemp -d)"
+    br=$( cd "$proj" && git rev-parse --abbrev-ref HEAD )
+    ( cd "$proj"
+      WORKFLOW_STATE_DIR="$sd" bash "$SCRIPT" init >/dev/null 2>&1
+      WORKFLOW_STATE_DIR="$sd" bash "$SCRIPT" start-feature "$slug" "$br" >/dev/null 2>&1
       mkdir -p "tickets/features/$slug"
-      printf '**Blocked by:** None\n**Status:** ready-for-agent\n' > "tickets/features/$slug/01-a.md"
-      printf '**Blocked by:** 01\n**Status:** ready-for-agent\n'   > "tickets/features/$slug/02-b.md"
+      printf '**Blocked by:** None\n' > "tickets/features/$slug/01-a.md"   # status lives in the map, not the file
+      printf '**Blocked by:** 01\n'   > "tickets/features/$slug/02-b.md"
       git add -A && git commit -qm tickets )
     printf '%s %s %s' "$proj" "$sd" "$slug"
 }
 
 # approve-spec / approve-tickets record pins + transition
 read -r proj sd slug <<<"$(feature_repo)"
-wf "$proj" "$sd" set-status designing >/dev/null 2>&1
 sha=$( cd "$proj" && git rev-parse HEAD )
 wf "$proj" "$sd" approve-spec "$sha" >/dev/null 2>&1
 check "approve-spec: status spec-approved" "0" "$?"
@@ -188,6 +190,58 @@ rm -rf "$proj" "$sd"
 proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
 rc=$( ( cd "$proj" && WORKFLOW_STATE_DIR="$sd" bash "$SCRIPT" tickets --feature >/dev/null 2>&1 ); echo $? )
 check "tickets --feature (no slug): errors, no hang" "1" "$rc"
+rm -rf "$proj" "$sd"
+
+# ── v3 part-2: status map, closed bundle, atomic lifecycle, resume ───────────
+
+# set-ticket writes to the map; tickets --feature reads status from the map (not the file)
+read -r proj sd slug <<<"$(feature_repo)"
+wf "$proj" "$sd" set-ticket "tickets/features/$slug/01-a.md" done >/dev/null 2>&1
+out="$(wf "$proj" "$sd" tickets --feature "$slug" 2>/dev/null)"
+check_contains "set-ticket: status from map (01 done)" "01-a.md"$'\t'"done" "$out"
+check_contains "set-ticket: 02 defaults ready-for-agent" "02-b.md"$'\t'"ready-for-agent" "$out"
+check_contains "set-ticket: 1/2 done" "1/2 done" "$out"
+rm -rf "$proj" "$sd"
+
+# closed bundle: a ticket added after approval -> check-ready refuses
+read -r proj sd slug <<<"$(feature_repo)"; sha=$( cd "$proj" && git rev-parse HEAD )
+wf "$proj" "$sd" approve-spec "$sha" >/dev/null 2>&1
+wf "$proj" "$sd" approve-tickets "$sha" "tickets/features/$slug/01-a.md" "tickets/features/$slug/02-b.md" >/dev/null 2>&1
+wf "$proj" "$sd" check-ready >/dev/null 2>&1; check "closed-set: baseline check-ready passes" "0" "$?"
+( cd "$proj" && printf '**Blocked by:** None\n' > "tickets/features/$slug/03-sneaky.md" )   # unapproved extra
+wf "$proj" "$sd" check-ready >/dev/null 2>&1
+check "closed-set: unapproved extra ticket refused" "1" "$?"
+rm -rf "$proj" "$sd"
+
+# status mutation no longer breaks approval (status is out of the hashed file), and resume works
+read -r proj sd slug <<<"$(feature_repo)"; sha=$( cd "$proj" && git rev-parse HEAD )
+wf "$proj" "$sd" approve-spec "$sha" >/dev/null 2>&1
+wf "$proj" "$sd" approve-tickets "$sha" "tickets/features/$slug/01-a.md" "tickets/features/$slug/02-b.md" >/dev/null 2>&1
+wf "$proj" "$sd" set-status working >/dev/null 2>&1
+wf "$proj" "$sd" set-ticket "tickets/features/$slug/01-a.md" in-progress >/dev/null 2>&1   # sanctioned mutation
+wf "$proj" "$sd" resume >/dev/null 2>&1
+check "resume: works after status mutation (digest stable)" "0" "$?"
+check_contains "resume: status back to working" "status: working" "$(cat "$sd/state.yaml")"
+rm -rf "$proj" "$sd"
+
+# start-feature refuses from a busy state
+read -r proj sd slug <<<"$(feature_repo)"   # already 'designing'
+wf "$proj" "$sd" start-feature other some-branch >/dev/null 2>&1
+check "start-feature: refused while a feature is active" "1" "$?"
+check_contains "start-feature: ledger unchanged (still demo)" "feature: demo" "$(cat "$sd/state.yaml")"
+rm -rf "$proj" "$sd"
+
+# finish merged -> idle + all feature state cleared
+read -r proj sd slug <<<"$(feature_repo)"; sha=$( cd "$proj" && git rev-parse HEAD )
+wf "$proj" "$sd" approve-spec "$sha" >/dev/null 2>&1
+wf "$proj" "$sd" approve-tickets "$sha" "tickets/features/$slug/01-a.md" "tickets/features/$slug/02-b.md" >/dev/null 2>&1
+wf "$proj" "$sd" set-status working >/dev/null 2>&1
+wf "$proj" "$sd" set-status shipping >/dev/null 2>&1
+wf "$proj" "$sd" finish merged >/dev/null 2>&1
+check "finish merged: status idle" "0" "$?"
+check_contains "finish merged: status idle" "status: idle" "$(cat "$sd/state.yaml")"
+check_contains "finish merged: feature cleared" "feature: null" "$(cat "$sd/state.yaml")"
+check "finish merged: manifest removed" "yes" "$([[ ! -f "$sd/manifest.tsv" ]] && echo yes || echo no)"
 rm -rf "$proj" "$sd"
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"

@@ -31,14 +31,14 @@ Router. Shared rules + the v2 state model are in
    user's call.** Outward-facing: no merge/push without their explicit choice.
    Honor the CLAUDE.md refspec rule on any push.
 
-4. **Transition + cleanup — conditional on the outcome:**
-   - **Merged** (branch finished & removed): remove the worktree, then
-     `bash $W set-status idle` and clear the pins/feature:
-     `bash $W set feature null; bash $W set branch null; bash $W set current_ticket null`
-     (`spec_commit`/`tickets_commit`/`manifest` are reset on the next feature's
-     approval). The ledger is in the git-common-dir, so this is checkout-independent.
-   - **PR opened:** `bash $W set-status pr-open` — keep the worktree/branch
-     (finishing-a-development-branch preserves them for PR feedback). Do NOT reset.
-   - **Keep the branch:** `bash $W set-status parked` — keep the worktree/branch.
-   - On a later confirmed external merge of the PR: `bash $W set-status idle` +
-     clear as in the merged case.
+4. **Transition + cleanup via one atomic command** — `bash $W finish <outcome>`
+   (only legal from `shipping`):
+   - **`merged`** — atomically resets to `idle` and clears ALL feature state
+     (feature/branch/pins/manifest/status-map) in one write; then remove the
+     worktree. Ledger is in the git-common-dir, so this is checkout-independent.
+   - **`pr`** — `pr-open`; keeps the worktree/branch (finishing-a-development-branch
+     preserves them for PR feedback). Not reset.
+   - **`keep`** — `parked`; keeps the worktree/branch.
+   - On a later confirmed external merge: `bash $W finish` isn't valid from
+     `pr-open`, so `bash $W cancel` (atomic reset-to-idle + clear) and remove the
+     worktree.
