@@ -25,12 +25,15 @@ EOF
 STATE_FILE=".ai/workflow.yaml"
 
 cmd_init() {
-    mkdir -p docs/specs docs/decisions tickets .ai
+    if ! mkdir -p docs/specs docs/decisions tickets .ai 2>/dev/null; then
+        echo "workflow: failed to create tracker directories (unwritable root or a path collides with a file)" >&2
+        return 1
+    fi
     if [[ -f "$STATE_FILE" ]]; then
         printf 'workflow: %s already exists, left untouched\n' "$STATE_FILE"
         return 0
     fi
-    cat > "$STATE_FILE" <<'EOF'
+    if ! cat > "$STATE_FILE" <<'EOF'
 # ABOUTME: Durable state for this project's dev workflow — the recovery map.
 # ABOUTME: After compaction, trust this file and `git log` over conversation memory.
 
@@ -47,6 +50,10 @@ current_ticket: null
 # Free-form notes for the next session to pick up.
 notes: null
 EOF
+    then
+        echo "workflow: failed to write $STATE_FILE" >&2
+        return 1
+    fi
     printf 'workflow: initialized local tracker and %s\n' "$STATE_FILE"
 }
 

@@ -16,6 +16,17 @@ Install it from the official marketplace before anything else:
 
 Use the actively maintained version (v5.0.7+). Skills evolve there faster than in any fork.
 
+### Required: plugins the dev-workflow skills depend on
+
+The `triage`/`feature`/`work` routers invoke skills from two more plugins — install both, or those commands fail with unknown-skill errors:
+
+```
+/plugin install mattpocock-skills@claude-plugins-official   # grilling, domain-modeling, research, prototype, codebase-design
+/plugin install reviewers@gni-skills                        # reviewers:codex (the /work review), + the codex push gate
+```
+
+(`mattpocock-skills`' `to-spec`/`to-tickets`/`triage` are user-only, so the routers inline those steps rather than invoking them — but the model-invocable skills above must be present.)
+
 ### Personal skills + CLAUDE.md: symlink from this repo
 
 `CLAUDE.md` and the personal skills (`java-style`, `grip-review`,

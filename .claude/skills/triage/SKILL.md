@@ -1,7 +1,7 @@
 ---
 name: triage
 disable-model-invocation: true
-description: Decide what to build from an inbound request, working a LOCAL ticket tracker only (never GitHub/Jira). Thin router over mattpocock-skills:triage with local-file enforcement. Invoke explicitly as the first gate; skip when work starts from your own idea (go straight to /feature).
+description: Decide what to build from an inbound request, working a LOCAL ticket tracker only (never GitHub/Jira). Inlines Matt Pocock's triage state machine (his triage skill is user-only, so a router can't invoke it) and uses model-invocable grilling/domain-modeling when a request needs shaping. Invoke explicitly as the first gate; skip when work starts from your own idea (go straight to /feature).
 when_to_use: When there is an inbound queue of requests/bugs to evaluate before committing to build. The user runs /triage. Skip for solo idea-driven work — /feature's grilling is the intake there.
 version: 1.0.0
 languages: all
@@ -22,22 +22,19 @@ rules; the iron rule (local files only) and the local layout live there.
    bash ~/.claude/skills/dev-workflow/scripts/workflow-state.sh init
    ```
 
-3. **Run the upstream triage skill** — invoke `mattpocock-skills:triage` — with
-   these overrides:
-   - The "issue tracker" is the local `tickets/` directory. Never GitHub
-     Issues, Jira, or any remote tracker.
-   - A ticket is a file `tickets/<NN>-<slug>.md`; its state is the
-     `**Status:**` line (`ready-for-agent` | `in-progress` | `done` |
-     `blocked`), not a tracker label.
-   - "Show what needs attention" = list `tickets/` files whose status is not
-     `done` (use `workflow-state.sh tickets`), plus any raw request the user
-     brings.
-   - Its redundancy / prior-rejection checks still apply: search the codebase
-     by domain concept, and read any `docs/decisions/` ADRs and out-of-scope
-     notes before recommending.
-   - If the request needs fleshing out, it will pull in grilling +
-     domain-modeling — that is exactly `/feature`'s job, so hand off to
-     `/feature` rather than duplicating the interview here.
+3. **Triage the request (inlined)** — Matt's `triage` skill is user-only, so run
+   its state machine here against the LOCAL `tickets/` (never GitHub/Jira):
+   - **Category:** `bug` | `enhancement`.
+   - **Redundancy / prior-rejection:** search the codebase by domain concept and
+     read `docs/decisions/` ADRs; if already implemented → `wontfix`.
+   - **Verify the claim** where you can (reproduce a bug from its steps).
+   - **State** (record on the ticket's `**Status:**` line):
+     `ready-for-agent` | `needs-info` | `ready-for-human` | `wontfix` |
+     `needs-triage`. ("Needs attention" = any ticket whose status is not `done`
+     / `wontfix` — `workflow-state.sh tickets` lists them.)
+   - If the request needs fleshing out, invoke `mattpocock-skills:grilling` +
+     `mattpocock-skills:domain-modeling` (both model-invocable), or hand off to
+     `/feature` (its grilling is the intake) rather than duplicating it here.
 
 4. **HUMAN GATE ↯** — present your category + state recommendation and wait for
    the maintainer to direct. Apply the outcome as a local ticket + status.

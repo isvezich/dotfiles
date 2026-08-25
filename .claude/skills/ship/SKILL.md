@@ -13,12 +13,15 @@ Thin router. Shared rules are in `~/.claude/skills/dev-workflow/workflow.md`.
 
 ## Steps
 
-1. **Confirm the tickets are all closed:**
+1. **Confirm there is a completed feature to ship:**
    ```bash
    bash ~/.claude/skills/dev-workflow/scripts/workflow-state.sh tickets
    ```
-   Expect `N/N done`. If not, return to `/work` — do not ship partial work.
-   Set `.ai/workflow.yaml` `status: shipping`.
+   Require **all three**: the ledger exists with a `feature` in flight, the
+   count is `N/N done`, **and N > 0**. A bare `0/0 done` (no tickets, wrong repo,
+   or failed init) is NOT shippable — stop, there's no feature in flight. If
+   `N/N` but N>0 with some not done, return to `/work`. Only then set
+   `.ai/workflow.yaml` `status: shipping`.
 
 2. **Fresh verification** — invoke `superpowers:verification-before-completion`.
    No completion claim without fresh evidence: run the full suite now, capture
@@ -31,7 +34,12 @@ Thin router. Shared rules are in `~/.claude/skills/dev-workflow/workflow.md`.
    Honor the CLAUDE.md refspec rule on any push (`git push <remote>
    <localref>:refs/heads/<remote-branch>`).
 
-4. **Clean up + reset state** — after the chosen integration, clean up the
-   worktree and reset `.ai/workflow.yaml` to `status: idle` with `feature`,
-   `branch`, and `current_ticket` cleared. Prune closed-out notes; keep only
-   what a future session needs.
+4. **Clean up + reset state — conditional on the outcome:**
+   - **Merged (branch finished & removed):** clean up the worktree and reset
+     `.ai/workflow.yaml` to `status: idle`, clearing `feature`, `spec`, `branch`,
+     and `current_ticket`. Prune closed-out notes.
+   - **PR opened, or keep-the-branch:** the work is still live — do NOT delete
+     the worktree and do NOT reset to idle. Leave `feature`/`spec`/`branch` set
+     and record `status: pr-open` (PR) or `status: parked` (keep) so a later
+     session can resume. (`finishing-a-development-branch` deliberately preserves
+     the worktree for these; don't undo that.)

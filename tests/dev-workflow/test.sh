@@ -56,6 +56,13 @@ printf 'feature: my-sentinel\n' > "$proj/.ai/workflow.yaml"
 check "second init preserves existing state file" "feature: my-sentinel" "$(cat "$proj/.ai/workflow.yaml")"
 rm -rf "$proj"
 
+# --- init: fails closed (non-zero) when a scaffold path collides with a file ---
+proj="$(new_project)"
+: > "$proj/docs"   # 'docs' is a file, so `mkdir -p docs/specs` must fail
+( cd "$proj" && bash "$SCRIPT" init >/dev/null 2>&1 )
+check "init fails closed on path collision" "1" "$?"
+rm -rf "$proj"
+
 # --- show: prints the state file; errors when absent ---
 proj="$(new_project)"
 ( cd "$proj" && bash "$SCRIPT" init >/dev/null 2>&1 )
