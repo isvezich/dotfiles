@@ -5,7 +5,7 @@
 
 **Blocked by:** 01 — extends the same helper + ledger.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] `approve-spec <sha>` — record `spec_commit: <sha>`, transition to
       `spec-approved`.

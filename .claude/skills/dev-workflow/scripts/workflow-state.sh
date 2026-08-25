@@ -103,6 +103,98 @@ cmd_tickets() {
     printf '%d/%d done\n' "$done" "$total"
 }
 
+# --- ticket 02: approval pins + validation ----------------------------------
+
+_sha() { if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -d' ' -f1; else shasum -a 256 | cut -d' ' -f1; fi; }
+
+# Set/replace a scalar field in the ledger (atomic).
+ledger_set() {
+    local key="$1" val="$2" tmp
+    tmp=$(mktemp "$(dirname "$LEDGER")/.state.XXXXXX") || return 1
+    if grep -q "^$key:" "$LEDGER"; then
+        sed "s|^$key:.*|$key: $val|" "$LEDGER" > "$tmp"
+    else
+        { cat "$LEDGER"; printf '%s: %s\n' "$key" "$val"; } > "$tmp"
+    fi
+    mv -f "$tmp" "$LEDGER"
+}
+ledger_get() { sed -n "s|^$1:[[:space:]]*||p" "$LEDGER" 2>/dev/null | head -n1; }
+
+cmd_approve_spec() {
+    local sha="${1:-}"; [[ -z "$sha" ]] && { echo "usage: approve-spec <sha>" >&2; return 1; }
+    cmd_set_status spec-approved || return 1
+    ledger_set spec_commit "$sha"
+}
+
+cmd_approve_tickets() {
+    local sha="${1:-}"; shift 2>/dev/null || true
+    [[ -z "$sha" || $# -eq 0 ]] && { echo "usage: approve-tickets <sha> <ticket>..." >&2; return 1; }
+    cmd_set_status ready-to-work || return 1
+    ledger_set tickets_commit "$sha"
+    local mf t; mf="$(dirname "$LEDGER")/manifest.tsv"; : > "$mf" || return 1
+    for t in "$@"; do printf '%s\t%s\n' "$t" "$(_sha < "$t")" >> "$mf"; done
+    ledger_set manifest "$mf"
+}
+
+# For /work: only proceed on approved, un-drifted work.
+cmd_check_ready() {
+    [[ -f "$LEDGER" ]] || { echo "check-ready: no ledger" >&2; return 1; }
+    [[ "$(ledger_status)" == ready-to-work ]] || { echo "check-ready: status is '$(ledger_status)', not ready-to-work" >&2; return 1; }
+    local pin; pin=$(ledger_get tickets_commit)
+    [[ -n "$pin" && "$pin" != null ]] || { echo "check-ready: no tickets_commit pin" >&2; return 1; }
+    git merge-base --is-ancestor "$pin" HEAD 2>/dev/null || { echo "check-ready: HEAD does not descend from approved commit $pin" >&2; return 1; }
+    local mf; mf=$(ledger_get manifest)
+    [[ -f "$mf" ]] || { echo "check-ready: manifest missing" >&2; return 1; }
+    local path digest cur
+    while IFS=$'\t' read -r path digest; do
+        [[ -f "$path" ]] || { echo "check-ready: approved ticket $path is missing" >&2; return 1; }
+        cur=$(_sha < "$path")
+        [[ "$cur" == "$digest" ]] || { echo "check-ready: $path drifted since approval — re-approve" >&2; return 1; }
+    done < "$mf"
+    return 0
+}
+
+# Validate a feature's ticket dependency graph (Kahn's algorithm).
+cmd_graph_validate() {
+    local slug="${1:-}"; [[ -z "$slug" ]] && { echo "usage: graph-validate <slug>" >&2; return 1; }
+    local dir="tickets/features/$slug" f id blockers b
+    local ids=() ; declare -A seen=() dep=() removed=()
+    shopt -s nullglob
+    for f in "$dir"/*.md; do
+        id="$(basename "$f")"; id="${id%%-*}"
+        [[ -n "${seen[$id]:-}" ]] && { echo "graph-validate: duplicate ticket id $id" >&2; shopt -u nullglob; return 1; }
+        seen[$id]=1; ids+=("$id")
+        local st; st="$(sed -n 's/^\*\*Status:\*\*[[:space:]]*//p' "$f" | head -n1)"
+        case "$st" in ready-for-agent|in-progress|done|blocked) : ;; *) echo "graph-validate: $id has unknown status '$st'" >&2; shopt -u nullglob; return 1;; esac
+        blockers="$(sed -n 's/^\*\*Blocked by:\*\*[[:space:]]*//p' "$f" | head -n1)"
+        if [[ "$blockers" == *[Nn]one* || -z "$blockers" ]]; then dep[$id]=""; else
+            dep[$id]="$(printf '%s' "$blockers" | grep -oE '[0-9]+' | tr '\n' ' ')"
+        fi
+    done
+    shopt -u nullglob
+    [[ ${#ids[@]} -eq 0 ]] && { echo "graph-validate: no tickets for $slug" >&2; return 1; }
+    # self-dep + unknown references
+    for id in "${ids[@]}"; do
+        for b in ${dep[$id]}; do
+            [[ "$b" == "$id" ]] && { echo "graph-validate: $id depends on itself" >&2; return 1; }
+            [[ -z "${seen[$b]:-}" ]] && { echo "graph-validate: $id blocked by unknown id $b" >&2; return 1; }
+        done
+    done
+    # Kahn: repeatedly remove a node whose blockers are all removed
+    local progress=1 remaining=${#ids[@]}
+    while [[ $remaining -gt 0 && $progress -eq 1 ]]; do
+        progress=0
+        for id in "${ids[@]}"; do
+            [[ -n "${removed[$id]:-}" ]] && continue
+            local ready=1
+            for b in ${dep[$id]}; do [[ -z "${removed[$b]:-}" ]] && { ready=0; break; }; done
+            [[ $ready -eq 1 ]] && { removed[$id]=1; remaining=$((remaining-1)); progress=1; }
+        done
+    done
+    [[ $remaining -eq 0 ]] || { echo "graph-validate: dependency cycle or no executable frontier in $slug" >&2; return 1; }
+    return 0
+}
+
 main() {
     local sd; sd=$(state_dir 2>/dev/null) || sd=""
     [[ -n "$sd" ]] && LEDGER="$sd/state.yaml"
@@ -111,7 +203,11 @@ main() {
         show)       cmd_show ;;
         set-status) shift; cmd_set_status "$@" ;;
         tickets)    shift; cmd_tickets "$@" ;;
-        -h|--help|help) echo "usage: workflow-state.sh {init | show | set-status <state> | tickets --feature <slug>}" >&2 ;;
+        approve-spec)    shift; cmd_approve_spec "$@" ;;
+        approve-tickets) shift; cmd_approve_tickets "$@" ;;
+        check-ready)     cmd_check_ready ;;
+        graph-validate)  shift; cmd_graph_validate "$@" ;;
+        -h|--help|help) echo "usage: workflow-state.sh {init | show | set-status <state> | tickets --feature <slug> | approve-spec <sha> | approve-tickets <sha> <ticket>... | check-ready | graph-validate <slug>}" >&2 ;;
         *)          echo "workflow: unknown command '${1:-}'" >&2; return 1 ;;
     esac
 }

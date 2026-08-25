@@ -87,5 +87,61 @@ wf "$proj" "$sd" bogus >/dev/null 2>&1
 check "unknown command: non-zero" "1" "$?"
 rm -rf "$proj" "$sd"
 
+# ── Ticket 02: approval pins, check-ready, graph-validate ────────────────────
+
+# helper: a repo mid-feature with committed tickets on a feature branch
+feature_repo() {  # -> prints "proj sd slug"
+    local proj sd slug=demo; proj="$(new_repo)"; sd="$(mktemp -d)"
+    ( cd "$proj" && WORKFLOW_STATE_DIR="$sd" bash "$SCRIPT" init >/dev/null 2>&1
+      mkdir -p "tickets/features/$slug"
+      printf '**Blocked by:** None\n**Status:** ready-for-agent\n' > "tickets/features/$slug/01-a.md"
+      printf '**Blocked by:** 01\n**Status:** ready-for-agent\n'   > "tickets/features/$slug/02-b.md"
+      git add -A && git commit -qm tickets )
+    printf '%s %s %s' "$proj" "$sd" "$slug"
+}
+
+# approve-spec / approve-tickets record pins + transition
+read -r proj sd slug <<<"$(feature_repo)"
+wf "$proj" "$sd" set-status designing >/dev/null 2>&1
+sha=$( cd "$proj" && git rev-parse HEAD )
+wf "$proj" "$sd" approve-spec "$sha" >/dev/null 2>&1
+check "approve-spec: status spec-approved" "0" "$?"
+check_contains "approve-spec: records commit" "spec_commit: $sha" "$(cat "$sd/state.yaml")"
+wf "$proj" "$sd" approve-tickets "$sha" "tickets/features/$slug/01-a.md" "tickets/features/$slug/02-b.md" >/dev/null 2>&1
+check "approve-tickets: ok" "0" "$?"
+check_contains "approve-tickets: status ready-to-work" "status: ready-to-work" "$(cat "$sd/state.yaml")"
+# check-ready passes when clean
+wf "$proj" "$sd" check-ready >/dev/null 2>&1
+check "check-ready: clean passes" "0" "$?"
+# digest drift -> fail closed
+( cd "$proj" && printf 'DRIFT\n' >> "tickets/features/$slug/01-a.md" )
+wf "$proj" "$sd" check-ready >/dev/null 2>&1
+check "check-ready: digest drift fails" "1" "$?"
+rm -rf "$proj" "$sd"
+
+# check-ready fails when status isn't ready-to-work
+read -r proj sd slug <<<"$(feature_repo)"
+wf "$proj" "$sd" set-status triaging >/dev/null 2>&1
+wf "$proj" "$sd" check-ready >/dev/null 2>&1
+check "check-ready: wrong status fails" "1" "$?"
+rm -rf "$proj" "$sd"
+
+# graph-validate: clean graph passes; a cycle fails
+read -r proj sd slug <<<"$(feature_repo)"
+wf "$proj" "$sd" graph-validate "$slug" >/dev/null 2>&1
+check "graph-validate: clean passes" "0" "$?"
+( cd "$proj" && printf '**Blocked by:** 02\n**Status:** ready-for-agent\n' > "tickets/features/$slug/01-a.md" )  # 01<->02 cycle
+wf "$proj" "$sd" graph-validate "$slug" >/dev/null 2>&1
+check "graph-validate: cycle fails" "1" "$?"
+rm -rf "$proj" "$sd"
+
+# graph-validate: no executable frontier (every ticket blocked) fails
+read -r proj sd slug <<<"$(feature_repo)"
+( cd "$proj" && printf '**Blocked by:** 02\n**Status:** ready-for-agent\n' > "tickets/features/$slug/01-a.md"
+  printf '**Blocked by:** 01\n**Status:** ready-for-agent\n' > "tickets/features/$slug/02-b.md" )
+wf "$proj" "$sd" graph-validate "$slug" >/dev/null 2>&1
+check "graph-validate: no frontier fails" "1" "$?"
+rm -rf "$proj" "$sd"
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]
