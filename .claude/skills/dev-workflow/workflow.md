@@ -23,7 +23,7 @@ namespace so ids can't collide across features.
 
 | Artifact | Location |
 |----------|----------|
-| Intake / triage records | `requests/<id>.md` (a `**Status:**` line: `needs-info` / `ready-for-human` / `wontfix`) |
+| Intake / triage records | `requests/<id>.md` (a `**Status:**` line — *active:* `needs-info` / `ready-for-human` (awaiting the human gate); *terminal:* `wontfix` / `adopted` (with a `→ <feature-slug>` pointer)) |
 | Specs | `docs/specs/<slug>.md` (with a `**Base:** <ref>` line — the feature's fork-point) |
 | ADRs / decisions | `docs/decisions/` |
 | Domain glossary | `CONTEXT.md` |
@@ -60,9 +60,12 @@ routers (their logic is interview-free), not invoked.
 `/work` reviews **each ticket** as it lands (fast feedback), and `/ship` runs a
 **whole-feature** review over the entire branch (`<feature-base>..HEAD`) — Claude
 via `requesting-code-review` **and** `reviewers:codex --base <feature-base>`
-together. The whole-feature pass restores cross-ticket coverage and produces the
-push-gate sentinel for the full outgoing diff (a per-ticket sentinel won't match
-it). The `<feature-base>` is the `**Base:**` recorded in the spec.
+together. The whole-feature pass restores cross-ticket coverage and produces a
+push-gate sentinel keyed to the **current checkout's** `<feature-base>..HEAD`
+diff (a per-ticket sentinel won't match it). Note the sentinel attests *that a
+review of this checkout ran* — it is not bound to the push's refs or remote tip,
+so it's a review nudge, not proof the pushed objects were reviewed. The
+`<feature-base>` is the `**Base:**` recorded in the spec.
 
 ## Context-rot discipline
 

@@ -24,9 +24,9 @@ Shared rules: `~/.claude/skills/dev-workflow/workflow.md`.
    - Redundancy / prior-rejection: search the codebase by domain concept, read
      `docs/decisions/` ADRs; if already implemented → `wontfix`.
    - Verify the claim where you can (reproduce a bug).
-   - Decide an intake status: `needs-info` | `ready-for-human` | `wontfix` (or
-     *adopt* — see step 4). Synthesize your own summary; don't forward the
-     inbound text verbatim.
+   - Decide an intake status — *active:* `needs-info` | `ready-for-human`
+     (awaiting the human gate); *terminal:* `wontfix` | `adopted` (see step 4).
+     Synthesize your own summary; don't forward the inbound text verbatim.
    - If it needs shaping, invoke `mattpocock-skills:grilling` +
      `mattpocock-skills:domain-modeling`, or hand to `/feature`.
 
@@ -35,6 +35,7 @@ Shared rules: `~/.claude/skills/dev-workflow/workflow.md`.
    `**Status:**` line.
 
 4. **Adopt for build** → hand off to `/feature` (which creates
-   `tickets/<feature-slug>/`). Mark the `requests/<id>.md` `**Status:**
-   ready-for-human` with a pointer to the feature slug, so the intake record is
-   closed out rather than left dangling.
+   `tickets/<feature-slug>/`). Mark the `requests/<id>.md` `**Status:** adopted`
+   with a `→ <feature-slug>` pointer — a terminal status, so a later `/triage`
+   run can tell adopted items from those still `ready-for-human` (awaiting a
+   decision).

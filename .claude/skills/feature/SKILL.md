@@ -21,10 +21,14 @@ logic is inlined below.
 ## Steps
 
 1. **Scaffold + branch:** `bash ~/.claude/skills/dev-workflow/scripts/workflow-state.sh init`
-   (creates `docs/specs/`, `docs/decisions/`, `tickets/`, `requests/`). Create/switch
-   to a feature branch. **Record the fork-point now:** `git rev-parse HEAD` on the
-   base branch is the feature's `<feature-base>` — you'll write it into the spec in
-   step 5 and `/work`+`/ship` review against it.
+   (creates `docs/specs/`, `docs/decisions/`, `tickets/`, `requests/`). Pick one
+   canonical `<slug>` for this feature — the spec is `docs/specs/<slug>.md` and the
+   tickets live in `tickets/<slug>/` (same value; keep them equal). **Record the
+   fork-point (`<feature-base>`):** capture `git rev-parse HEAD` on the target
+   branch *before* creating the feature branch; if you're resuming an existing
+   branch, derive it with `git merge-base <target-branch> HEAD` (not `HEAD`, which
+   is the tip). You'll write it into the spec in step 5; `/work`+`/ship` review
+   against it. Then create/switch to the feature branch. One feature per branch.
 
 2. **Classify + frame** (inline): spike / bounded / architectural — say which,
    and don't implement before the gates below. (Consult `superpowers:brainstorming`'s
@@ -34,7 +38,11 @@ logic is inlined below.
    `mattpocock-skills:domain-modeling`. Land domain terms in `CONTEXT.md`,
    hard-to-reverse decisions as ADRs in `docs/decisions/`.
 
-4. **De-risk as needed:** `research`, `prototype`, `codebase-design`.
+4. **De-risk as needed:** `research`, `prototype`, `codebase-design`. **Override
+   `prototype`'s completion rule:** it's a throwaway spike only — capture the
+   validated decision as an ADR/spec note locally, do NOT fold it into production
+   code, open no external issue, and return to the feature branch. `/feature` has
+   not passed its gates yet, so no implementation lands here.
 
 5. **Spec (inline):** synthesize (no re-interview) `docs/specs/<slug>.md` —
    Problem, Solution, User Stories, Implementation Decisions (incl. the test

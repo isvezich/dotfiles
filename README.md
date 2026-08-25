@@ -21,10 +21,17 @@ Use the actively maintained version (v5.0.7+). Skills evolve there faster than i
 The `triage`/`feature`/`work` routers invoke skills from two more plugins — install both, or those commands fail with unknown-skill errors:
 
 ```
-/plugin install mattpocock-skills@claude-plugins-official   # grilling, domain-modeling, research, prototype, codebase-design
-/plugin marketplace add https://github.netflix.net/corp/gni-skills.git   # gni-skills isn't built in
-/plugin install reviewers@gni-skills                        # reviewers:codex (the /work review), + the codex push gate
+/plugin install mattpocock-skills@claude-plugins-official
+/plugin marketplace add https://github.netflix.net/corp/gni-skills.git
+/plugin install reviewers@gni-skills
 ```
+
+(These are Claude Code slash commands — copy each line alone, without a trailing
+comment, or the plugin manager takes the comment as an argument.)
+`mattpocock-skills` supplies `grilling`, `domain-modeling`, `research`,
+`prototype`, `codebase-design`; the marketplace `add` is needed because
+`gni-skills` isn't built in; `reviewers@gni-skills` supplies `reviewers:codex`
+(the `/work` review) and the codex push gate.
 
 (`mattpocock-skills`' `to-spec`/`to-tickets`/`triage` are user-only, so the routers inline those steps rather than invoking them — but the model-invocable skills above must be present.)
 
@@ -131,7 +138,7 @@ The Claude Code hooks in `.claude/hooks/`. All are opt-in: each is a script you 
 
 ### Optional: pre-push review gate (via the `reviewers` plugin)
 
-Blocks `git push` / `gh pr create` until the diff being pushed has been reviewed. This is the generic gate shipped by the [`reviewers`](https://github.netflix.net/corp/gni-skills) plugin (`review-gate.sh`), not a hand-rolled one — the home-grown `codex-gate.sh`/`codex-review-capture` were retired in favour of it. The plugin's `codex-review-capture.sh` writes a hash-keyed sentinel (`/tmp/review-gate-reviewed-${UID}-${repo}-${diffhash}`) on each successful `codex review` bug-finding pass; the gate hashes the diff being pushed and admits it only when a sentinel matches. Modify the tree and the hash drifts, so the gate re-blocks until you re-review.
+A **process aid, not a security boundary**: it nudges you to review the current checkout before `git push` / `gh pr create`. This is the generic gate shipped by the [`reviewers`](https://github.netflix.net/corp/gni-skills) plugin (`review-gate.sh`), not a hand-rolled one — the home-grown `codex-gate.sh`/`codex-review-capture` were retired in favour of it. The plugin's `codex-review-capture.sh` writes a hash-keyed sentinel (`/tmp/review-gate-reviewed-${UID}-${repo}-${diffhash}`) on each successful `codex review` bug-finding pass; the gate hashes the **current checkout's** `git diff <base>` and admits it only when a sentinel matches. Modify the tree and the hash drifts, so the gate re-blocks until you re-review. Caveats worth knowing: the sentinel is keyed by user + repo-basename + base + diff-hash, so it attests *a review of this checkout ran* — it is **not** bound to the push's source/destination refs or the remote tip (a real `pre-push` hook would be), the `/tmp` sentinels are forgeable by the same user, and it runs auto-updated plugin code (unpinned, and a fallback registry can supply the reviewer binary) in every repo. Treat it as a reminder, and pin/track the plugin version if you need stronger supply-chain assurance.
 
 Wired **globally** in `~/.claude/settings.json` (every repo, not per-project):
 

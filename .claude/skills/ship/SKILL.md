@@ -28,10 +28,13 @@ share shell variables).
    `superpowers:requesting-code-review` (Claude, with the
    `~/.claude/skills/dev-workflow/smell-baseline.md` Fowler lens) **and**
    `reviewers:codex --base <feature-base>` together in one message. This restores
-   cross-ticket coverage and writes the push-gate sentinel for the full outgoing
-   diff (per-ticket sentinels won't match it). Resolve every blocking finding
-   (re-review after fixes) before continuing; a scope-changing finding sends you
-   back to `/feature`'s gate.
+   cross-ticket coverage and writes the push-gate sentinel for this checkout's
+   `<feature-base>..HEAD` diff (per-ticket sentinels won't match it; the sentinel
+   attests the review ran, it is not bound to the push's refs). A review only
+   counts if **both** reviewers complete over that range — a plugin/network/
+   timeout failure blocks, it is not "no findings." Resolve every blocking
+   finding, committing each fix and confirming a clean tree before re-review; a
+   scope-changing finding sends you back to `/feature`'s **spec** gate (step 5).
 
 3. **Fresh verification** — invoke `superpowers:verification-before-completion`:
    run the full suite now and capture the actual output; don't rely on earlier

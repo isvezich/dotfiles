@@ -56,6 +56,29 @@ here: it is coordination metadata, not transactional machinery.
   *dual-model review*. Those are preserved and, in `/ship`, extended to the whole
   feature.
 
+## Accepted risks / explicitly declined machinery
+
+A prose checklist cannot *enforce* invariants, so a rigorous reviewer will always
+find "nothing stops X." Round-8 review confirmed the concrete bugs are fixed
+(base-ref provenance, commit-before-review, `adopted` intake status, scope→spec
+gate) but flagged deeper enforcement gaps. These are **declined as YAGNI for a
+solo workflow** and accepted as risks the human owns, not defects to automate
+away:
+
+- **Push-gate attestation.** The review sentinel attests *a review of the current
+  checkout ran*; it is not bound to the push's refs or remote tip and its `/tmp`
+  key is same-user forgeable. A real remote-SHA `pre-push` hook is not built —
+  the gate is documented as a process aid, not a security boundary.
+- **Feature/branch manifest.** No retained target-ref, ancestry validation at
+  `/ship`, or stacked-feature semantics. Convention is one feature per branch,
+  one canonical `<slug>` for `docs/specs/<slug>.md` and `tickets/<slug>/`, and a
+  `**Base:**` fork-point in the spec; the human keeps them consistent.
+- **Immutable review state.** No `REVIEW_HEAD` tracking that auto-invalidates on
+  a later commit; instead `/work` and `/ship` require a clean tree and committed
+  fixes before every (re-)review.
+- **Workflow-level acceptance harness.** Only the helper is unit-tested; the
+  router prose is not driven by an end-to-end scenario suite.
+
 ## Consequences
 
 - The workflow enforces nothing; the human drives the gates and owns status and
