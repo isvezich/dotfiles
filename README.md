@@ -93,7 +93,6 @@ for b in bin/*; do
 done
 ```
 
-- `codex-review-capture` — wrapper around `codex review` used by the [codex pre-push gate](#optional-codex-pre-push-gate) below. Captures the full transcript to `/tmp/codex-review.*` (owner-only, cleaned on reboot) and prints only the verdict (content after the last `^codex$` marker) to stdout.
 - `pyparse` — syntax-checks Python files via `ast.parse`, with no `.pyc` / `__pycache__` litter (unlike `python3 -m py_compile`). `pyparse FILE [FILE ...]`.
 - `screen` — compatibility wrapper that maps common GNU `screen` invocations to `tmux`.
 
@@ -108,37 +107,32 @@ The Claude Code hooks in `.claude/hooks/`. All are opt-in: each is a script you 
 | [`block-git-add-all.py`](#optional-bash-behavior-nudge-hooks) | PreToolUse — `Bash(git *)` | Block bulk `git add -A`/`--all`/`.`/`./`/`*` |
 | [`read-write-edit-block.py`](#optional-bash-behavior-nudge-hooks) | PreToolUse — `Bash(cat/head/sed/echo *)` | Nudge single-file `cat`/`head`/`sed`/`echo` to Read/Write/Edit |
 | [`block-docker-root.py`](#optional-block-docker-containers-running-as-root) | PreToolUse — `Bash(docker */docker-compose *)` | Deny `docker run`/`exec`/`create`/`compose run`/`compose exec` lacking a non-root `--user` |
-| [`codex-gate.sh`](#optional-codex-pre-push-gate) (+ `codex-gate-pass.sh`) | PreToolUse `git push`/`gh pr create` + PostToolUse | Block a push/PR until a `codex review` ran on the diff |
 
-(`cleanup-grip.sh`, a `SessionEnd` hook that kills leftover grip servers, belongs to the grip-review skill and is covered with it above.)
+(`cleanup-grip.sh`, a `SessionEnd` hook that kills leftover grip servers, belongs to the grip-review skill and is covered with it above. The pre-push review gate is no longer a local hook — it's the `reviewers` plugin's gate, wired globally; see [Pre-push review gate](#optional-pre-push-review-gate-via-the-reviewers-plugin).)
 
-### Optional: codex pre-push gate
+### Optional: pre-push review gate (via the `reviewers` plugin)
 
-`bin/codex-review-capture` and the hooks in `.claude/hooks/` together implement a per-project gate that blocks `git push` and `gh pr create` until a `codex review` has run with a recognized mode flag in the same Claude Code session, and re-blocks if the diff has changed since.
+Blocks `git push` / `gh pr create` until the diff being pushed has been reviewed. This is the generic gate shipped by the [`reviewers`](https://github.netflix.net/corp/gni-skills) plugin (`review-gate.sh`), not a hand-rolled one — the home-grown `codex-gate.sh`/`codex-review-capture` were retired in favour of it. The plugin's `codex-review-capture.sh` writes a hash-keyed sentinel (`/tmp/review-gate-reviewed-${UID}-${repo}-${diffhash}`) on each successful `codex review` bug-finding pass; the gate hashes the diff being pushed and admits it only when a sentinel matches. Modify the tree and the hash drifts, so the gate re-blocks until you re-review.
 
-Flow:
-1. The model runs `codex-review-capture --commit <sha>` (or `--base <branch>`, or `--uncommitted`). The wrapper detects the mode and computes `(BASE, HASH)` for exactly the diff codex sees, *before* invoking codex (so a long-running review can't be raced by working-tree edits). On `rc=0` the wrapper leaves a staged file at `/tmp/codex-gate-staged-${UID}-${repo}-${pid}` and prints `staged=<path>` to stderr.
-2. `codex-gate-pass.sh` (PostToolUse, only fires on success) reads the staged path from `tool_response.stderr` and renames the file to a session-keyed sentinel `/tmp/codex-gate-${SESSION_ID}-${repo}`.
-3. `codex-gate.sh` (PreToolUse on `git push *` / `gh pr create *`) recomputes `git diff BASE` against the current tree, compares to the stored hash, and either consumes the sentinel and allows the push or exits 2 with a message.
+Wired **globally** in `~/.claude/settings.json` (every repo, not per-project):
 
-Caveats:
-- The hooks are opt-in per project. Each project that wants the gate references the scripts from its own `.claude/settings.local.json`.
-- `codex-review-capture --uncommitted` requires a clean untracked state. If untracked files are present, the wrapper fails closed with a stderr message asking you to `git add` them first. This avoids index mutation and keeps the gate's verification logic simple.
-- `codex-review-capture` without a mode flag does not write a sentinel — the gate fails closed.
-- `--commit X` reviews only commit X's diff. The gate then checks that the working tree at push time produces the same diff vs `X^`, but it does NOT verify that only X is being pushed. For multi-commit branches, prefer `--base <branch>` to review the full unpushed range.
-
-Install the hook scripts once:
-
-```bash
-cd "$(git rev-parse --show-toplevel)"
-mkdir -p ~/.claude/hooks
-
-for h in codex-gate.sh codex-gate-pass.sh; do
-  ln -sf "$PWD/.claude/hooks/$h" "$HOME/.claude/hooks/$h"
-done
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "if": "Bash(git push *) Bash(gh pr create *)",
+        "hooks": [
+          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/review-gate.sh" }
+        ]
+      }
+    ]
+  }
+}
 ```
 
-Activate the gate in a project by merging the contents of [`.claude/hooks/settings.local.example.json`](.claude/hooks/settings.local.example.json) into that project's `.claude/settings.local.json`. The example uses each hook entry's `if` field (permission-rule syntax) so the scripts only spawn for the gated commands — no overhead on every Bash call.
+Requirements: `uv`, `python3`, and network on first use (the gate parses bash via `bashlex`; `uv` caches it after). Satisfy the gate with `/reviewers:codex --base <branch>` (or `--commit HEAD`, `--uncommitted`); only the bug-finding pass writes the sentinel, not the advisory design pass. The `reviewers` plugin must be installed (`/plugin install reviewers@gni-skills`).
 
 ### Optional: bash behavior-nudge hooks
 
