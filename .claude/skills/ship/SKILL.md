@@ -28,7 +28,12 @@ share shell variables).
    — `git rev-parse --verify "<feature-base>^{commit}"` and
    `git merge-base --is-ancestor <feature-base> HEAD`; if it isn't a real ancestor
    (e.g. after a rebase), stop and return through `/feature`'s spec gate with a
-   human-picked base rather than guessing. Then dispatch
+   human-picked base rather than guessing. Caveat (accepted, human-owned): passing
+   ancestry is necessary but not sufficient — if the feature was rebased onto or
+   merged a *newer* target since `Base` was recorded, the old `Base` stays an
+   ancestor while `<feature-base>..HEAD` balloons to include unrelated upstream
+   commits. If that's happened, refresh `Base` via the spec gate before reviewing.
+   Then dispatch
    `superpowers:requesting-code-review` (Claude, with the
    `~/.claude/skills/dev-workflow/smell-baseline.md` Fowler lens **and** the
    approved spec + each ticket's acceptance criteria in the brief, so the review
@@ -42,7 +47,11 @@ share shell variables).
    Resolve every blocking finding, committing each fix and confirming a clean tree
    before re-review; a scope-changing finding sends you back to `/feature`'s
    **spec** gate (step 5). When both pass, **note `REVIEW_HEAD` = `git rev-parse
-   HEAD`** (a literal sha held in context).
+   HEAD`** (a literal sha held in context). On a *resumed* session where
+   `REVIEW_HEAD` was lost and the diff is unchanged, `reviewers:codex` returns
+   `cached; gate already unblocked` instead of a fresh verdict — delete the
+   wrapper-named `/tmp/review-gate-reviewed-*` cache file and re-run so you get a
+   real review, don't treat the cache hit as a pass.
 
 3. **Fresh verification** — invoke `superpowers:verification-before-completion`:
    run the full suite now and capture the actual output; don't rely on earlier

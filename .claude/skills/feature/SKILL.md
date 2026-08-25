@@ -54,7 +54,10 @@ logic is inlined below.
 6. **Tickets (inline):** break the spec into tracer-bullet vertical slices at
    `tickets/<feature-slug>/<NN>-<slug>.md` (one dir per feature — ids never
    collide across features), in dependency order (blockers first), each with
-   `**What to build:**`, `**Blocked by:**` (ids or None), `**Status:**
-   ready-for-agent`, and acceptance checkboxes. **HUMAN GATE ↯ — ticket approval.**
+   `**What to build:**`, `**Blocked by:**`, `**Status:** ready-for-agent`, and
+   acceptance checkboxes. **ID grammar** (so `/work`'s frontier check is
+   deterministic): a ticket's id is its `<NN>` numeric prefix, unique within the
+   feature; `**Blocked by:**` is a comma-separated list of those ids, or `None`.
+   **HUMAN GATE ↯ — ticket approval.**
 
 Commit the artifacts and hand off to `/work`.
