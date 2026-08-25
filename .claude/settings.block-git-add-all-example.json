@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/achen/.claude/hooks/block-git-add-all.py",
+            "command": "$HOME/.claude/hooks/block-git-add-all.py",
             "if": "Bash(git *)"
           }
         ]

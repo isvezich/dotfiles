@@ -1,6 +1,6 @@
 # dotfiles
 
-Andrew's dotfiles, forked from [obra/dotfiles](https://github.com/obra/dotfiles).
+Personal dotfiles, forked from [obra/dotfiles](https://github.com/obra/dotfiles).
 
 ## Claude Code install
 
@@ -16,9 +16,30 @@ Install it from the official marketplace before anything else:
 
 Use the actively maintained version (v5.0.7+). Skills evolve there faster than in any fork.
 
+### Required: plugins the dev-workflow skills depend on
+
+The `triage`/`feature`/`work` routers invoke skills from two more plugins — install both, or those commands fail with unknown-skill errors:
+
+```
+/plugin install mattpocock-skills@claude-plugins-official
+/plugin marketplace add https://github.netflix.net/corp/gni-skills.git
+/plugin install reviewers@gni-skills
+```
+
+(These are Claude Code slash commands — copy each line alone, without a trailing
+comment, or the plugin manager takes the comment as an argument.)
+`mattpocock-skills` supplies `grilling`, `domain-modeling`, `research`,
+`prototype`, `codebase-design`; the marketplace `add` is needed because
+`gni-skills` isn't built in; `reviewers@gni-skills` supplies `reviewers:codex`
+(the `/work` review) and the codex push gate.
+
+(`mattpocock-skills`' `to-spec`/`to-tickets`/`triage` are user-only, so the routers inline those steps rather than invoking them — but the model-invocable skills above must be present.)
+
 ### Personal skills + CLAUDE.md: symlink from this repo
 
-`CLAUDE.md` and Andrew's personal skills (`java-style`, `grip-review`, `e2e-scenario-testing`) live in this repo. Install them into `~/.claude/` with symlinks:
+`CLAUDE.md` and the personal skills (`java-style`, `grip-review`,
+`e2e-scenario-testing`, and the `triage`/`feature`/`work`/`ship`/`dev-workflow`
+set) live in this repo. Install them into `~/.claude/` with symlinks:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -26,7 +47,7 @@ mkdir -p ~/.claude/skills
 
 ln -sf "$PWD/.claude/CLAUDE.md" ~/.claude/CLAUDE.md
 
-for s in java-style grip-review e2e-scenario-testing; do
+for s in java-style grip-review e2e-scenario-testing triage feature work ship dev-workflow; do
   ln -sf "$PWD/.claude/skills/$s" "$HOME/.claude/skills/$s"
 done
 ```
@@ -54,6 +75,37 @@ ln -sf "$PWD/.claude/hooks/cleanup-grip.sh" "$HOME/.claude/hooks/cleanup-grip.sh
 
 Then merge `.claude/settings.grip-review-example.json` into your live `~/.claude/settings.json` (the live file is intentionally not tracked; the example shows the allow rule and the SessionEnd hook entry to add).
 
+#### The dev-workflow skills
+
+`triage`, `feature`, `work`, and `ship` are a four-verb development loop that
+combines the Superpowers process spine with Matt Pocock's design skills, wired
+to keep the coordinator context lean. They are **thin routers** — they invoke
+the tuned upstream skills in order and stop at human gates; they do not
+reimplement upstream content.
+
+```
+/triage   → decide what to build          (skip if no queue)
+/feature  → design + break down            approve spec, then approve tickets
+/work     → execute the tickets            autonomous between tickets
+/ship     → verify + integrate             choose merge / PR / keep
+```
+
+They are **human-driven checklists**, deliberately not a state machine (a robust
+state-machine attempt was abandoned as over-engineered — see
+[ADR 0001](docs/decisions/0001-dev-workflow-simple.md)). `dev-workflow/` holds the
+shared reference (`workflow.md`) and a trivial `scripts/workflow-state.sh` that
+only scaffolds and lists (`init`, `tickets [feature-slug]`). All
+triage/specs/tickets are local files (never GitHub/Jira), with intake kept
+separate from execution: triage records in `requests/`, execution tickets in
+per-feature `tickets/<feature-slug>/<NN>-<slug>.md` (each with a `**Status:**`
+line), plus `docs/specs/` (each spec carries a `**Base:**` fork-point line),
+`docs/decisions/`, `CONTEXT.md`. These are coordination identifiers, not a
+transactional state machine: no ledger, no commit-pinning — the human drives the
+gates. `/work` reviews each ticket and `/ship` reviews the whole branch, both
+dual-model (Superpowers `requesting-code-review` + `reviewers:codex` + the Fowler
+smell lens). Run `workflow-state.sh init` to scaffold. Tests:
+`bash tests/dev-workflow/test.sh`.
+
 ### Helper scripts: symlink from ~/bin
 
 Scripts under `bin/` are meant to live on `PATH` via `~/bin/`:
@@ -67,7 +119,6 @@ for b in bin/*; do
 done
 ```
 
-- `codex-review-capture` — wrapper around `codex review` used by the [codex pre-push gate](#optional-codex-pre-push-gate) below. Captures the full transcript to `/tmp/codex-review.*` (owner-only, cleaned on reboot) and prints only the verdict (content after the last `^codex$` marker) to stdout.
 - `pyparse` — syntax-checks Python files via `ast.parse`, with no `.pyc` / `__pycache__` litter (unlike `python3 -m py_compile`). `pyparse FILE [FILE ...]`.
 - `screen` — compatibility wrapper that maps common GNU `screen` invocations to `tmux`.
 
@@ -82,37 +133,32 @@ The Claude Code hooks in `.claude/hooks/`. All are opt-in: each is a script you 
 | [`block-git-add-all.py`](#optional-bash-behavior-nudge-hooks) | PreToolUse — `Bash(git *)` | Block bulk `git add -A`/`--all`/`.`/`./`/`*` |
 | [`read-write-edit-block.py`](#optional-bash-behavior-nudge-hooks) | PreToolUse — `Bash(cat/head/sed/echo *)` | Nudge single-file `cat`/`head`/`sed`/`echo` to Read/Write/Edit |
 | [`block-docker-root.py`](#optional-block-docker-containers-running-as-root) | PreToolUse — `Bash(docker */docker-compose *)` | Deny `docker run`/`exec`/`create`/`compose run`/`compose exec` lacking a non-root `--user` |
-| [`codex-gate.sh`](#optional-codex-pre-push-gate) (+ `codex-gate-pass.sh`) | PreToolUse `git push`/`gh pr create` + PostToolUse | Block a push/PR until a `codex review` ran on the diff |
 
-(`cleanup-grip.sh`, a `SessionEnd` hook that kills leftover grip servers, belongs to the grip-review skill and is covered with it above.)
+(`cleanup-grip.sh`, a `SessionEnd` hook that kills leftover grip servers, belongs to the grip-review skill and is covered with it above. The pre-push review gate is no longer a local hook — it's the `reviewers` plugin's gate, wired globally; see [Pre-push review gate](#optional-pre-push-review-gate-via-the-reviewers-plugin).)
 
-### Optional: codex pre-push gate
+### Optional: pre-push review gate (via the `reviewers` plugin)
 
-`bin/codex-review-capture` and the hooks in `.claude/hooks/` together implement a per-project gate that blocks `git push` and `gh pr create` until a `codex review` has run with a recognized mode flag in the same Claude Code session, and re-blocks if the diff has changed since.
+A **process aid, not a security boundary**: it nudges you to review the current checkout before `git push` / `gh pr create`. This is the generic gate shipped by the [`reviewers`](https://github.netflix.net/corp/gni-skills) plugin (`review-gate.sh`), not a hand-rolled one — the home-grown `codex-gate.sh`/`codex-review-capture` were retired in favour of it. The plugin's `codex-review-capture.sh` writes a hash-keyed sentinel (`/tmp/review-gate-reviewed-${UID}-${repo}-${diffhash}`) on each successful `codex review` bug-finding pass; the gate hashes the **current checkout's** `git diff <base>` and admits it only when a sentinel matches. Modify the tree and the hash drifts, so the gate re-blocks until you re-review. Caveats worth knowing: the sentinel is keyed by user + repo-basename + base + diff-hash, so it attests *a review of this checkout ran* — it is **not** bound to the push's source/destination refs or the remote tip (a real `pre-push` hook would be), the `/tmp` sentinels are forgeable by the same user, and it runs auto-updated plugin code (unpinned, and a fallback registry can supply the reviewer binary) in every repo. Treat it as a reminder, and pin/track the plugin version if you need stronger supply-chain assurance.
 
-Flow:
-1. The model runs `codex-review-capture --commit <sha>` (or `--base <branch>`, or `--uncommitted`). The wrapper detects the mode and computes `(BASE, HASH)` for exactly the diff codex sees, *before* invoking codex (so a long-running review can't be raced by working-tree edits). On `rc=0` the wrapper leaves a staged file at `/tmp/codex-gate-staged-${UID}-${repo}-${pid}` and prints `staged=<path>` to stderr.
-2. `codex-gate-pass.sh` (PostToolUse, only fires on success) reads the staged path from `tool_response.stderr` and renames the file to a session-keyed sentinel `/tmp/codex-gate-${SESSION_ID}-${repo}`.
-3. `codex-gate.sh` (PreToolUse on `git push *` / `gh pr create *`) recomputes `git diff BASE` against the current tree, compares to the stored hash, and either consumes the sentinel and allows the push or exits 2 with a message.
+Wired **globally** in `~/.claude/settings.json` (every repo, not per-project):
 
-Caveats:
-- The hooks are opt-in per project. Each project that wants the gate references the scripts from its own `.claude/settings.local.json`.
-- `codex-review-capture --uncommitted` requires a clean untracked state. If untracked files are present, the wrapper fails closed with a stderr message asking you to `git add` them first. This avoids index mutation and keeps the gate's verification logic simple.
-- `codex-review-capture` without a mode flag does not write a sentinel — the gate fails closed.
-- `--commit X` reviews only commit X's diff. The gate then checks that the working tree at push time produces the same diff vs `X^`, but it does NOT verify that only X is being pushed. For multi-commit branches, prefer `--base <branch>` to review the full unpushed range.
-
-Install the hook scripts once:
-
-```bash
-cd "$(git rev-parse --show-toplevel)"
-mkdir -p ~/.claude/hooks
-
-for h in codex-gate.sh codex-gate-pass.sh; do
-  ln -sf "$PWD/.claude/hooks/$h" "$HOME/.claude/hooks/$h"
-done
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "if": "Bash(git push *) Bash(gh pr create *)",
+        "hooks": [
+          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/review-gate.sh" }
+        ]
+      }
+    ]
+  }
+}
 ```
 
-Activate the gate in a project by merging the contents of [`.claude/hooks/settings.local.example.json`](.claude/hooks/settings.local.example.json) into that project's `.claude/settings.local.json`. The example uses each hook entry's `if` field (permission-rule syntax) so the scripts only spawn for the gated commands — no overhead on every Bash call.
+Requirements: `uv`, `python3`, and network on first use (the gate parses bash via `bashlex`; `uv` caches it after). Satisfy the gate with `/reviewers:codex --base <upstream>` for a branch push — **use `--base`, not `--commit HEAD`**: `--commit HEAD` reviews only the tip, so a multi-commit push can send earlier unreviewed commits and still match the sentinel. Only the bug-finding pass writes the sentinel, not the advisory design pass. The `reviewers` plugin must be installed (see the required-plugins section, incl. the `gni-skills` marketplace).
 
 ### Optional: bash behavior-nudge hooks
 

@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 HOOK = Path(__file__).resolve().parent.parent / ".claude" / "hooks" / "block-git-dash-c.py"
-CWD = "/home/achen/git/gh/dotfiles"
+CWD = str(Path(__file__).resolve().parent.parent)
 
 
 def run(cmd: str, tool: str = "Bash", cwd: str = CWD) -> tuple[int, str]:
@@ -76,7 +76,7 @@ DENY_CASES = [
 ]
 
 ALLOW_CASES = [
-    ("git -C different",              "git -C /home/achen status"),
+    ("git -C different",              "git -C /tmp status"),
     ("plain git status",              "git status"),
     ("cd different && git",           "cd /tmp && git status"),
     # `||` runs git only on cd FAILURE — not a redundant relocation.

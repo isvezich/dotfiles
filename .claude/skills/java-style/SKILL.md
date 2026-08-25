@@ -1,6 +1,6 @@
 ---
 name: java-style
-description: Andrew's personal Java and Kotlin style rules — linter hygiene, Guava/Apache Commons bias, test access patterns, constant and import conventions. Complementary to (not overlapping with) the Netflix-generic java-context skill.
+description: the user's personal Java and Kotlin style rules — linter hygiene, Guava/Apache Commons bias, test access patterns, constant and import conventions. Complementary to (not overlapping with) the Netflix-generic java-context skill.
 when_to_use: When writing, editing, or reviewing Java or Kotlin source files. When deciding between Guava/Apache Commons vs. hand-rolled helpers. When adding a test that needs access to a private method. When importing a constant from an inner class or enum.
 version: 1.0.0
 languages: java, kotlin
@@ -15,7 +15,7 @@ Personal style rules beyond what a linter catches. Apply alongside the Netflix-g
 ## Imports
 
 - **No wildcard imports.** Ever.
-- **No shaded imports without asking Andrew first.** Shaded imports typically have "shade" or "shaded" in the package path — they're repackaged copies of a dependency and cause subtle classpath issues.
+- **No shaded imports without asking the user first.** Shaded imports typically have "shade" or "shaded" in the package path — they're repackaged copies of a dependency and cause subtle classpath issues.
 - **Import inner classes for constants.** When pulling a constant from an inner class or enum, import the inner class itself so the code reads `Inner.CONSTANT` rather than `Outer.Inner.CONSTANT`.
 - **Static-import sufficiently descriptive constants.** `SomeClass.NUMBER_OF_COWS` should get a static import. If static-importing would create ambiguity (e.g., `NUM` and `NUMBER` both get pulled in and the reader can't tell which is which), skip the static import.
 
@@ -47,4 +47,4 @@ Examples: `Strings.isNullOrEmpty`, `Preconditions.checkArgument`, `Iterables.get
 
 ## Relationship to java-context
 
-`java-context` covers Netflix-generic Java setup (Gradle/Nebula, Spring Boot Netflix, DGS, gRPC, JUnit/Mockito/AssertJ, test slices, Newt app types). This skill covers Andrew's personal preferences on top. When they conflict, ask Andrew.
+`java-context` covers Netflix-generic Java setup (Gradle/Nebula, Spring Boot Netflix, DGS, gRPC, JUnit/Mockito/AssertJ, test slices, Newt app types). This skill covers the user's personal preferences on top. When they conflict, ask the user.

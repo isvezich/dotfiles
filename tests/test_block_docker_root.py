@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 HOOK = Path(__file__).resolve().parent.parent / ".claude" / "hooks" / "block-docker-root.py"
-CWD = "/home/achen/git/gh/dotfiles"
+CWD = str(Path(__file__).resolve().parent.parent)
 
 
 def run_raw(stdin: str) -> tuple[int, str]:
@@ -47,7 +47,7 @@ DENY_CASES = [
     ("-u0",                     "docker run -u0 img"),
     ("-u 0",                    "docker run -u 0 img"),
     ("-itu0 cluster root",      "docker run -itu0 img"),
-    ("username",                "docker run --user achen img"),
+    ("username",                "docker run --user svezich img"),
     ("bare --user val=img",     "docker run --user img"),
     ("unclassifiable var",      "docker run --user $SOMEVAR img"),
     ("--userns not user",       "docker run --userns=host img"),

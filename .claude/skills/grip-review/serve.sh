@@ -42,7 +42,7 @@ FABS="$FDIR/$(basename "$FILE")"
 # go-grip roots its file server at path.Dir(arg) and serves that whole subtree.
 # The superpowers workflow writes specs to docs/superpowers/specs/ and plans to
 # docs/superpowers/plans/ — different directories under a shared ancestor. To let
-# Andrew view a spec and its plan at the same time, root ONE grip at that common
+# the user view a spec and its plan at the same time, root ONE grip at that common
 # ancestor (docs/superpowers) so both are served at /specs/.. and /plans/.. by a
 # single daemon. Any other markdown roots at its own directory.
 #

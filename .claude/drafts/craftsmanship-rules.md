@@ -54,7 +54,7 @@ Symptoms suggesting one of these should become active:
 - Reviewing code and noticing the same anti-pattern repeatedly
 - Refactor sessions that balloon scope or break tests for long stretches
 - Functions growing past ~50 lines without pushback
-- Andrew flags "the model keeps doing X" where X matches one of the rules
+- The user flags "the model keeps doing X" where X matches one of the rules
 
 ## Source
 
