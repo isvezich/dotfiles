@@ -1,7 +1,7 @@
 ---
 name: work
 disable-model-invocation: true
-description: Execute the approved tickets in an isolated worktree via Superpowers subagent-driven development (fresh agent + TDD + review + verification per ticket), with a parallel Matt Pocock two-axis code review. Runs the tickets autonomously — no human gate between them. Updates the durable ledger after each. Invoke explicitly as /work.
+description: Execute the approved tickets in an isolated worktree via Superpowers subagent-driven development (fresh agent + TDD + review + verification per ticket), with a parallel cross-model Codex review (reviewers:codex) and the Fowler smell baseline as an extra lens. Runs the tickets autonomously — no human gate between them. Updates the durable ledger after each. Invoke explicitly as /work.
 when_to_use: When a feature has an approved spec and local tickets and you are ready to implement. The user runs /work. Follows /feature.
 version: 1.0.0
 languages: all
@@ -37,10 +37,19 @@ action, out-of-worktree side effect, or a plan so broken every path is a guess).
    agent uses `superpowers:systematic-debugging` (root cause before fix) —
    escalate to architecture review after 3+ failed fixes.
 
-4. **Two-axis review** — invoke `mattpocock-skills:code-review` (Standards ‖
-   Spec) on the ticket's diff, in parallel with the Superpowers task review.
-   Per the user's CLAUDE.md, also fire `reviewers:codex` alongside any
-   Superpowers review. Dispatch reviews in one message so they run concurrently.
+4. **Independent review — two models, one Claude pass** — the Superpowers task
+   review (Claude) runs on the ticket's diff; per the user's CLAUDE.md, fire
+   `reviewers:codex` (GPT-5.5) alongside it for a cross-model second opinion.
+   Dispatch both in one message so they run concurrently. Only one Claude-side
+   review by design: the Superpowers reviewer is the more rigorous rubric — it
+   treats the implementer's report as unverified, cross-checks named risks
+   outside the diff (lock ordering, API contracts, shared state), and covers
+   tests/security/architecture/production-readiness. A second same-model review
+   would mostly correlate; the extra bug-catching comes from the Codex model.
+   Extra lens: append `~/.claude/skills/dev-workflow/smell-baseline.md` (the
+   Fowler code-smell baseline, grafted from mattpocock's review) to the task
+   reviewer's brief so the one Claude pass also matches the diff against those
+   12 design smells.
 
 5. **Close the ticket** — set the ticket's `**Status:** done`, clear
    `current_ticket`, and prune any now-stale notes from `.ai/workflow.yaml`.
