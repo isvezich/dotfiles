@@ -21,15 +21,25 @@ logic is inlined below.
 
 ## Steps
 
-1. **Branch + worktree FIRST** — before writing any artifact, invoke
-   `superpowers:using-git-worktrees` to create the feature branch + worktree, and
-   `cd` there. Everything below happens in that worktree. Then `bash $W init`,
-   `bash $W set feature <slug>`, `bash $W set branch <branch>`, `bash $W
-   set-status designing`. (The ledger lives in the git-common-dir, so it's shared
+1. **Guard, then branch + worktree FIRST.** `bash $W init`, then
+   **`bash $W set-status designing` BEFORE recording anything** — it only
+   succeeds from `idle`/`triaging`, so it aborts here (no ledger corruption) if a
+   previous feature is still `working`/`ready-to-work`/`parked`/`pr-open` (finish
+   or park it first). Only on success: invoke `superpowers:using-git-worktrees`,
+   then **explicitly create/verify the named feature branch** — that skill may
+   reuse an existing/detached worktree or fall back to the current checkout, so
+   confirm you are on a fresh `feature/<slug>` branch (create it if not) rather
+   than trusting the outcome. `cd` into the worktree; `bash $W set feature <slug>`,
+   `bash $W set branch feature/<slug>`. (Ledger is in the git-common-dir, shared
    with the primary checkout.)
 
-2. **Frame + classify** — invoke `superpowers:brainstorming` (spike / bounded /
-   architectural + its HARD-GATE). This also absorbs the Superpowers auto-trigger.
+2. **Classify (inline — do not hand control to brainstorming's full flow).**
+   `superpowers:brainstorming` is not a classification primitive: for
+   architectural work it writes/commits its own spec and mandates
+   `writing-plans`; for bounded work it jumps to implementation — either bypasses
+   steps 3–6. So classify here yourself (spike / bounded / architectural), state
+   it, and hold the "no implementation before approval" gate. Consult
+   brainstorming's rubric if useful, but keep control in this router.
 
 3. **Grill + capture docs** — invoke `mattpocock-skills:grilling` and
    `mattpocock-skills:domain-modeling` (model-invocable). Land domain terms in

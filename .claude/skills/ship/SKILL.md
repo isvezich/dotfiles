@@ -18,10 +18,13 @@ Router. Shared rules + the v2 state model are in
    --feature <slug>` (slug from the ledger). Require **all three**: a `feature`
    in flight with `status: working`, `N/N done`, **and N > 0**. A bare `0/0`
    (no feature / wrong repo) is NOT shippable — stop. Some not-done → back to
-   `/work`. Then `bash $W set-status shipping`.
+   `/work`. (Do NOT transition to `shipping` yet — verify first, next step.)
 
-2. **Fresh verification** — invoke `superpowers:verification-before-completion`:
+2. **Fresh verification FIRST** — invoke `superpowers:verification-before-completion`:
    run the full suite now, capture actual output; don't rely on per-ticket runs.
+   Only when it passes: `bash $W set-status shipping`. If it fails, `bash $W
+   set-status working` (or `blocked` with a reason) and return to `/work` — do
+   not enter `shipping` on a red suite (there's no clean way back out mid-ship).
 
 3. **Finish the branch** — invoke `superpowers:finishing-a-development-branch`:
    present the integration menu. **HUMAN GATE ↯ — merge / PR / keep is the

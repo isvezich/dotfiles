@@ -152,5 +152,43 @@ wf "$proj" "$sd" set status working >/dev/null 2>&1
 check "set: refuses status (must use set-status)" "1" "$?"
 rm -rf "$proj" "$sd"
 
+# ── v3 part-1 regressions ────────────────────────────────────────────────────
+
+# sed-injection: a notes value with | and & must NOT blank/corrupt the ledger
+proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
+wf "$proj" "$sd" set notes 'a|b & c' >/dev/null 2>&1
+check "ledger_set: survives pipe/ampersand (ledger intact)" "0" "$([[ -s "$sd/state.yaml" ]] && echo 0 || echo 1)"
+check_contains "ledger_set: value written literally" "notes: a|b & c" "$(cat "$sd/state.yaml")"
+check_contains "ledger_set: other fields intact" "status: idle" "$(cat "$sd/state.yaml")"
+rm -rf "$proj" "$sd"
+
+# bash-3.2 octal-id trap: ids 08/09 must validate cleanly
+proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
+mkdir -p "$proj/tickets/features/oct"
+printf '**Blocked by:** None\n**Status:** ready-for-agent\n' > "$proj/tickets/features/oct/08-a.md"
+printf '**Blocked by:** 08\n**Status:** ready-for-agent\n'   > "$proj/tickets/features/oct/09-b.md"
+wf "$proj" "$sd" graph-validate oct >/dev/null 2>&1
+check "graph-validate: 08/09 ids ok (no octal error)" "0" "$?"
+# run the same under /bin/bash (macOS 3.2) to catch declare -A / octal regressions
+if [[ -x /bin/bash ]]; then
+    ( cd "$proj" && WORKFLOW_STATE_DIR="$sd" /bin/bash "$SCRIPT" graph-validate oct >/dev/null 2>&1 )
+    check "graph-validate: works under /bin/bash" "0" "$?"
+fi
+rm -rf "$proj" "$sd"
+
+# malformed blocker ref (typo O1) is rejected, not treated as a root
+proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
+mkdir -p "$proj/tickets/features/mal"
+printf '**Blocked by:** O1 (typo)\n**Status:** ready-for-agent\n' > "$proj/tickets/features/mal/01-a.md"
+wf "$proj" "$sd" graph-validate mal >/dev/null 2>&1
+check "graph-validate: malformed blocker rejected" "1" "$?"
+rm -rf "$proj" "$sd"
+
+# tickets --feature with no slug -> usage error, not an infinite loop
+proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
+rc=$( ( cd "$proj" && WORKFLOW_STATE_DIR="$sd" bash "$SCRIPT" tickets --feature >/dev/null 2>&1 ); echo $? )
+check "tickets --feature (no slug): errors, no hang" "1" "$rc"
+rm -rf "$proj" "$sd"
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]

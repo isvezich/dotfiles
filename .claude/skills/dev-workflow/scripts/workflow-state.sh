@@ -27,6 +27,8 @@ _legal() {
         spec-approved:ready-to-work|spec-approved:designing|\
         ready-to-work:working|\
         working:shipping|working:blocked|\
+        working:designing|blocked:designing|\
+        shipping:working|shipping:blocked|\
         shipping:pr-open|shipping:parked|\
         pr-open:idle|parked:working|blocked:working) return 0 ;;
     esac
@@ -71,12 +73,7 @@ cmd_set_status() {
     if ! _legal "$from" "$to"; then
         echo "workflow: illegal transition ${from:-<empty>} -> $to" >&2; return 1
     fi
-    local tmp; tmp=$(mktemp "$(dirname "$LEDGER")/.state.XXXXXX") || return 1
-    if sed "s/^status:.*/status: $to/" "$LEDGER" > "$tmp"; then
-        mv -f "$tmp" "$LEDGER"
-    else
-        rm -f "$tmp"; echo "workflow: failed to update status" >&2; return 1
-    fi
+    ledger_set status "$to"
 }
 
 # tickets --feature <slug>: list/count ONLY that feature's execution tickets.
@@ -84,7 +81,8 @@ cmd_tickets() {
     local slug=""
     while (($#)); do
         case "$1" in
-            --feature) slug="${2:-}"; shift 2 ;;
+            --feature) [[ $# -ge 2 ]] || { echo "usage: tickets --feature <slug>" >&2; return 1; }
+                       slug="$2"; shift 2 ;;
             *) shift ;;
         esac
     done
@@ -107,16 +105,25 @@ cmd_tickets() {
 
 _sha() { if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -d' ' -f1; else shasum -a 256 | cut -d' ' -f1; fi; }
 
-# Set/replace a scalar field in the ledger (atomic).
+# Set/replace a scalar field in the ledger (atomic). Never interpolates the value
+# into a sed program (a `|`/`&` in notes would blank or corrupt the ledger) — the
+# value is only ever emitted via printf, and the ledger is replaced only after a
+# fully successful rewrite.
 ledger_set() {
-    local key="$1" val="$2" tmp
+    local key="$1" val="$2" tmp line found=0
     tmp=$(mktemp "$(dirname "$LEDGER")/.state.XXXXXX") || return 1
-    if grep -q "^$key:" "$LEDGER"; then
-        sed "s|^$key:.*|$key: $val|" "$LEDGER" > "$tmp"
+    if {
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            if [[ "$line" == "$key:"* ]]; then printf '%s: %s\n' "$key" "$val"; found=1
+            else printf '%s\n' "$line"; fi
+        done < "$LEDGER"
+        [[ $found -eq 0 ]] && printf '%s: %s\n' "$key" "$val"
+        :
+    } > "$tmp"; then
+        mv -f "$tmp" "$LEDGER"
     else
-        { cat "$LEDGER"; printf '%s: %s\n' "$key" "$val"; } > "$tmp"
+        rm -f "$tmp"; echo "workflow: failed to update $key" >&2; return 1
     fi
-    mv -f "$tmp" "$LEDGER"
 }
 ledger_get() { sed -n "s|^$1:[[:space:]]*||p" "$LEDGER" 2>/dev/null | head -n1; }
 
@@ -166,45 +173,55 @@ cmd_check_ready() {
     return 0
 }
 
-# Validate a feature's ticket dependency graph (Kahn's algorithm).
+# Validate a feature's ticket dependency graph. Bash-3.2 safe: no associative
+# arrays, no numeric indexing by ticket id (ids like 08/09 are octal traps).
+# Edges are held in a temp file "id<TAB>blocker-ids"; membership is string search.
 cmd_graph_validate() {
     local slug="${1:-}"; [[ -z "$slug" ]] && { echo "usage: graph-validate <slug>" >&2; return 1; }
-    local dir="tickets/features/$slug" f id blockers b
-    local ids=() ; declare -A seen=() dep=() removed=()
+    local dir="tickets/features/$slug" edges f id st bl nums stripped b idlist=" "
+    edges=$(mktemp) || return 1
+    _gv_fail() { echo "graph-validate: $1" >&2; rm -f "$edges"; shopt -u nullglob; return 1; }
     shopt -s nullglob
     for f in "$dir"/*.md; do
         id="$(basename "$f")"; id="${id%%-*}"
-        [[ -n "${seen[$id]:-}" ]] && { echo "graph-validate: duplicate ticket id $id" >&2; shopt -u nullglob; return 1; }
-        seen[$id]=1; ids+=("$id")
-        local st; st="$(sed -n 's/^\*\*Status:\*\*[[:space:]]*//p' "$f" | head -n1)"
-        case "$st" in ready-for-agent|in-progress|done|blocked) : ;; *) echo "graph-validate: $id has unknown status '$st'" >&2; shopt -u nullglob; return 1;; esac
-        blockers="$(sed -n 's/^\*\*Blocked by:\*\*[[:space:]]*//p' "$f" | head -n1)"
-        if [[ "$blockers" == *[Nn]one* || -z "$blockers" ]]; then dep[$id]=""; else
-            dep[$id]="$(printf '%s' "$blockers" | grep -oE '[0-9]+' | tr '\n' ' ')"
+        case "$idlist" in *" $id "*) _gv_fail "duplicate ticket id $id"; return 1 ;; esac
+        idlist="$idlist$id "
+        st="$(sed -n 's/^\*\*Status:\*\*[[:space:]]*//p' "$f" | head -n1)"
+        case "$st" in ready-for-agent|in-progress|done|blocked|"") : ;; *) _gv_fail "$id has unknown status '$st'"; return 1 ;; esac
+        bl="$(sed -n 's/^\*\*Blocked by:\*\*[[:space:]]*//p' "$f" | head -n1)"
+        if [[ -z "${bl// /}" ]] || printf '%s' "$bl" | grep -qiE '^[[:space:]]*none'; then
+            nums=""
+        else
+            nums="$(printf '%s' "$bl" | grep -oE '[0-9]+' | tr '\n' ' ')"
+            stripped="$(printf '%s' "$bl" | tr -d '0-9, ')"
+            if [[ -z "$nums" || -n "$stripped" ]]; then _gv_fail "$id has malformed 'Blocked by' ($bl)"; return 1; fi
         fi
+        printf '%s\t%s\n' "$id" "$nums" >> "$edges"
     done
     shopt -u nullglob
-    [[ ${#ids[@]} -eq 0 ]] && { echo "graph-validate: no tickets for $slug" >&2; return 1; }
-    # self-dep + unknown references
-    for id in "${ids[@]}"; do
-        for b in ${dep[$id]}; do
-            [[ "$b" == "$id" ]] && { echo "graph-validate: $id depends on itself" >&2; return 1; }
-            [[ -z "${seen[$b]:-}" ]] && { echo "graph-validate: $id blocked by unknown id $b" >&2; return 1; }
+    [[ -s "$edges" ]] || { echo "graph-validate: no tickets for $slug" >&2; rm -f "$edges"; return 1; }
+    # self-dependency + unknown references
+    while IFS=$'\t' read -r id bl; do
+        for b in $bl; do
+            [[ "$b" == "$id" ]] && { echo "graph-validate: $id depends on itself" >&2; rm -f "$edges"; return 1; }
+            case "$idlist" in *" $b "*) : ;; *) echo "graph-validate: $id blocked by unknown id $b" >&2; rm -f "$edges"; return 1 ;; esac
         done
+    done < "$edges"
+    # Kahn's: resolve any node whose blockers are all resolved; a pass with no
+    # progress but nodes remaining means a cycle / no executable frontier.
+    local resolved=" " progress remaining ok
+    while :; do
+        progress=0; remaining=0
+        while IFS=$'\t' read -r id bl; do
+            case "$resolved" in *" $id "*) continue ;; esac
+            ok=1
+            for b in $bl; do case "$resolved" in *" $b "*) : ;; *) ok=0; break ;; esac; done
+            if [[ $ok -eq 1 ]]; then resolved="$resolved$id "; progress=1; else remaining=1; fi
+        done < "$edges"
+        [[ $remaining -eq 0 ]] && break
+        [[ $progress -eq 0 ]] && { echo "graph-validate: dependency cycle or no executable frontier in $slug" >&2; rm -f "$edges"; return 1; }
     done
-    # Kahn: repeatedly remove a node whose blockers are all removed
-    local progress=1 remaining=${#ids[@]}
-    while [[ $remaining -gt 0 && $progress -eq 1 ]]; do
-        progress=0
-        for id in "${ids[@]}"; do
-            [[ -n "${removed[$id]:-}" ]] && continue
-            local ready=1
-            for b in ${dep[$id]}; do [[ -z "${removed[$b]:-}" ]] && { ready=0; break; }; done
-            [[ $ready -eq 1 ]] && { removed[$id]=1; remaining=$((remaining-1)); progress=1; }
-        done
-    done
-    [[ $remaining -eq 0 ]] || { echo "graph-validate: dependency cycle or no executable frontier in $slug" >&2; return 1; }
-    return 0
+    rm -f "$edges"; return 0
 }
 
 main() {
