@@ -1,68 +1,46 @@
 ---
 name: feature
 disable-model-invocation: true
-description: Start an approved feature — create its branch+worktree first, design it (grilling/domain-modeling), then write a local spec and tickets committed on the branch with commit-pinned approval. Writes LOCAL files only. Two human gates. Invoke explicitly as /feature.
-when_to_use: When starting a new, approved piece of work and you need a design, spec, and ticket breakdown before implementation. The user runs /feature. Follows /triage adopting an inbox item, or is itself the intake for solo idea-driven work.
-version: 2.0.0
+description: Start an approved feature — design it (grilling/domain-modeling), then write a local spec and break it into local tickets. A human-driven checklist over a flat local tracker (no state machine). Two human gates. Invoke explicitly as /feature.
+when_to_use: When starting a new, approved piece of work and you need a design, spec, and ticket breakdown before implementation. The user runs /feature. Follows /triage, or is the intake for solo idea-driven work.
+version: 3.0.0
 languages: all
 ---
 
-# /feature — design and break down work (v2)
+# /feature — design and break down work
 
-Router. Shared rules + the v2 state model are in
-`~/.claude/skills/dev-workflow/workflow.md` — read it first this session.
+A human-driven checklist. Shared rules are in
+`~/.claude/skills/dev-workflow/workflow.md`. This is deliberately NOT a state
+machine — you drive it; the flat tracker just holds artifacts.
 
-**Invocability:** a router can only invoke *model-invocable* skills. Invoke
-`grilling`, `domain-modeling`, `research`, `prototype`, `codebase-design`. Matt's
-`grill-with-docs`/`to-spec`/`to-tickets` are user-only — their (interview-free)
+**Invocability:** a router can only invoke *model-invocable* skills — `grilling`,
+`domain-modeling`, `research`, `prototype`, `codebase-design`. Matt's
+`grill-with-docs`/`to-spec`/`to-tickets` are user-only, so their (interview-free)
 logic is inlined below.
-
-`W=~/.claude/skills/dev-workflow/scripts/workflow-state.sh`
 
 ## Steps
 
-1. **Guard + record atomically, then branch + worktree FIRST.** `bash $W init`,
-   then **`bash $W start-feature <slug> feature/<slug>`** — one atomic write that
-   succeeds only from `idle`/`triaging` (aborts, no corruption, if a previous
-   feature is still active — finish/park it first) and records `feature`,
-   `branch`, and `status: designing` together. Only on success: invoke
-   `superpowers:using-git-worktrees` and **explicitly create/verify the
-   `feature/<slug>` branch** (that skill may reuse an existing/detached worktree
-   or fall back to the current checkout — confirm you're on a fresh
-   `feature/<slug>`, creating it if not), then `cd` into the worktree. (Ledger is
-   in the git-common-dir, shared with the primary checkout.)
+1. **Scaffold:** `bash ~/.claude/skills/dev-workflow/scripts/workflow-state.sh init`
+   (creates `docs/specs/`, `docs/decisions/`, `tickets/`). Work on a feature
+   branch (create one if you're on the default branch).
 
-2. **Classify (inline — do not hand control to brainstorming's full flow).**
-   `superpowers:brainstorming` is not a classification primitive: for
-   architectural work it writes/commits its own spec and mandates
-   `writing-plans`; for bounded work it jumps to implementation — either bypasses
-   steps 3–6. So classify here yourself (spike / bounded / architectural), state
-   it, and hold the "no implementation before approval" gate. Consult
-   brainstorming's rubric if useful, but keep control in this router.
+2. **Classify + frame** (inline): spike / bounded / architectural — say which,
+   and don't implement before the gates below. (Consult `superpowers:brainstorming`'s
+   rubric if useful, but keep control here rather than handing off to its full flow.)
 
-3. **Grill + capture docs** — invoke `mattpocock-skills:grilling` and
-   `mattpocock-skills:domain-modeling` (model-invocable). Land domain terms in
-   `CONTEXT.md`, hard-to-reverse decisions as ADRs in `docs/decisions/`.
+3. **Grill + capture docs:** invoke `mattpocock-skills:grilling` and
+   `mattpocock-skills:domain-modeling`. Land domain terms in `CONTEXT.md`,
+   hard-to-reverse decisions as ADRs in `docs/decisions/`.
 
-4. **De-risk as needed** — `research` (background primary-source facts),
-   `prototype` (throwaway spike), `codebase-design` (seam/depth vocabulary).
+4. **De-risk as needed:** `research`, `prototype`, `codebase-design`.
 
-5. **Spec (inlined, committed)** — synthesize (no re-interview) `docs/specs/<slug>.md`:
-   Problem, Solution, User Stories, Implementation Decisions (incl. test seams —
-   prefer existing, highest seam), Testing Decisions, Out of Scope. **Commit it.**
-   **HUMAN GATE ↯ — spec approval.** On approval:
-   `bash $W approve-spec $(git rev-parse HEAD) docs/specs/<slug>.md docs/decisions/*.md`
-   (pins the spec/ADR bundle).
+5. **Spec (inline):** synthesize (no re-interview) `docs/specs/<slug>.md` —
+   Problem, Solution, User Stories, Implementation Decisions (incl. the test
+   seams), Testing Decisions, Out of Scope. **HUMAN GATE ↯ — spec approval.**
 
-6. **Tickets (inlined, committed)** — break the spec into tracer-bullet vertical
-   slices at `tickets/features/<slug>/<NN>-<slug>.md`, each with `**What to
-   build:**`, `**Blocked by:**` (ids or None), and acceptance checkboxes; size
-   each to one fresh context window. **Do NOT put a `Status:` line in the ticket
-   file** — execution status lives in the ledger's status map (defaults
-   `ready-for-agent`), keeping the approval digest stable. **Commit them.**
-   Then `bash $W graph-validate <slug>` (fix any cycle/dup/no-frontier it reports).
-   **HUMAN GATE ↯ — ticket approval.** On approval:
-   `bash $W approve-tickets $(git rev-parse HEAD) tickets/features/<slug>/*.md`
-   → status becomes `ready-to-work`.
+6. **Tickets (inline):** break the spec into tracer-bullet vertical slices at
+   `tickets/<NN>-<slug>.md`, in dependency order (blockers first), each with
+   `**What to build:**`, `**Blocked by:**` (ids or None), `**Status:**
+   ready-for-agent`, and acceptance checkboxes. **HUMAN GATE ↯ — ticket approval.**
 
-Hand off to `/work` once `ready-to-work`.
+Commit the artifacts and hand off to `/work`.

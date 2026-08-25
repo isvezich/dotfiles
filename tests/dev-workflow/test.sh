@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# ABOUTME: Tests for dev-workflow/scripts/workflow-state.sh (v2 state machine).
-# ABOUTME: Throwaway git repos; ledger redirected via WORKFLOW_STATE_DIR. No external deps.
+# ABOUTME: Tests for the trivial dev-workflow scaffold+read helper (no state machine).
+# ABOUTME: Throwaway dirs; no external deps.
 
 set -uo pipefail
 
@@ -11,238 +11,41 @@ check() { local d="$1" e="$2" a="$3"; if [[ "$a" == "$e" ]]; then pass=$((pass+1
     fail=$((fail+1)); printf 'FAIL: %s\n  expected: %q\n  actual:   %q\n' "$d" "$e" "$a"; fi; }
 check_contains() { local d="$1" n="$2" h="$3"; if [[ "$h" == *"$n"* ]]; then pass=$((pass+1)); else
     fail=$((fail+1)); printf 'FAIL: %s\n  want-contains: %q\n  actual: %q\n' "$d" "$n" "$h"; fi; }
+newp() { mktemp -d; }
 
-# A throwaway git repo. Prints its path.
-new_repo() {
-    local d; d="$(mktemp -d)"
-    ( cd "$d" && git init -q && git config user.email t@t && git config user.name t &&
-      printf 'a\n' > f && git add f && git commit -qm c1 )
-    printf '%s' "$d"
-}
-# run the helper in repo $1 with the ledger redirected to a temp state dir $2
-wf() { ( cd "$1" && WORKFLOW_STATE_DIR="$2" bash "$SCRIPT" "${@:3}" ); }
+# init scaffolds the flat tracker
+p="$(newp)"; ( cd "$p" && bash "$SCRIPT" init >/dev/null 2>&1 )
+check "init: docs/specs"     "yes" "$([[ -d "$p/docs/specs" ]] && echo yes || echo no)"
+check "init: docs/decisions" "yes" "$([[ -d "$p/docs/decisions" ]] && echo yes || echo no)"
+check "init: tickets"        "yes" "$([[ -d "$p/tickets" ]] && echo yes || echo no)"
+rm -rf "$p"
 
-# ── init: creates ledger (in the state dir) + inbox/ + features/ ─────────────
-proj="$(new_repo)"; sd="$(mktemp -d)"
-wf "$proj" "$sd" init >/dev/null 2>&1
-check "init: ledger created in state dir"  "yes" "$([[ -f "$sd/state.yaml" ]] && echo yes || echo no)"
-check "init: tickets/inbox created"        "yes" "$([[ -d "$proj/tickets/inbox" ]] && echo yes || echo no)"
-check "init: tickets/features created"     "yes" "$([[ -d "$proj/tickets/features" ]] && echo yes || echo no)"
-check_contains "init: ledger starts idle"  "status: idle" "$(cat "$sd/state.yaml")"
-rm -rf "$proj" "$sd"
-
-# default ledger location is the git-common-dir (WORKFLOW_STATE_DIR unset)
-proj="$(new_repo)"
-( cd "$proj" && bash "$SCRIPT" init >/dev/null 2>&1 )
-gcd="$( cd "$proj" && git rev-parse --git-common-dir )"
-check "init: default ledger under git-common-dir" "yes" "$([[ -f "$proj/$gcd/dev-workflow/state.yaml" || -f "$gcd/dev-workflow/state.yaml" ]] && echo yes || echo no)"
-rm -rf "$proj"
-
-# init fails closed when a scaffold path collides with a file
-proj="$(new_repo)"; sd="$(mktemp -d)"
-: > "$proj/tickets"   # 'tickets' is a file -> mkdir tickets/inbox must fail
-wf "$proj" "$sd" init >/dev/null 2>&1
+# init fails closed on a path collision
+p="$(newp)"; : > "$p/tickets"
+( cd "$p" && bash "$SCRIPT" init >/dev/null 2>&1 )
 check "init: fails closed on collision" "1" "$?"
-rm -rf "$proj" "$sd"
+rm -rf "$p"
 
-# ── show ────────────────────────────────────────────────────────────────────
-proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
-check_contains "show: prints ledger" "status:" "$(wf "$proj" "$sd" show 2>/dev/null)"
-rm -rf "$proj" "$sd"
-proj="$(new_repo)"; sd="$(mktemp -d)"
-wf "$proj" "$sd" show >/dev/null 2>&1
-check "show: errors when absent" "1" "$?"
-rm -rf "$proj" "$sd"
+# tickets lists status + done/total, defaulting a missing status
+p="$(newp)"; ( cd "$p" && bash "$SCRIPT" init >/dev/null 2>&1 )
+printf '# 01\n**Status:** done\n'            > "$p/tickets/01-a.md"
+printf '# 02\n**Status:** ready-for-agent\n' > "$p/tickets/02-b.md"
+printf '# 03 (no status)\n'                  > "$p/tickets/03-c.md"
+out="$( cd "$p" && bash "$SCRIPT" tickets 2>/dev/null )"
+check_contains "tickets: 01 done"        "01-a.md"$'\t'"done" "$out"
+check_contains "tickets: 03 (none)"      "03-c.md"$'\t'"(none)" "$out"
+check_contains "tickets: 1/3 done"       "1/3 done" "$out"
+rm -rf "$p"
 
-# ── set-status: legal transitions succeed, illegal are rejected ──────────────
-proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
-wf "$proj" "$sd" set-status triaging >/dev/null 2>&1
-check "set-status: idle->triaging ok" "0" "$?"
-check_contains "set-status: persisted" "status: triaging" "$(cat "$sd/state.yaml")"
-wf "$proj" "$sd" set-status working >/dev/null 2>&1   # illegal from triaging
-check "set-status: illegal transition rejected" "1" "$?"
-check_contains "set-status: status unchanged after illegal" "status: triaging" "$(cat "$sd/state.yaml")"
-# a full legal path
-for s in designing spec-approved ready-to-work working shipping idle; do
-    wf "$proj" "$sd" set-status "$s" >/dev/null 2>&1 || { echo "FAIL: legal set-status $s rejected"; fail=$((fail+1)); }
-done
-check "set-status: walked the legal path to idle" "status: idle" "$(grep '^status:' "$sd/state.yaml")"
-rm -rf "$proj" "$sd"
-
-# ── tickets --feature: counts only that feature's execution tickets ──────────
-proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
-mkdir -p "$proj/tickets/features/foo" "$proj/tickets/features/bar" "$proj/tickets/inbox"
-: > "$proj/tickets/features/foo/01-a.md"; : > "$proj/tickets/features/foo/02-b.md"
-: > "$proj/tickets/inbox/x.md"; : > "$proj/tickets/features/bar/01-c.md"
-wf "$proj" "$sd" set-ticket "tickets/features/foo/01-a.md" done >/dev/null 2>&1        # status via the map
-wf "$proj" "$sd" set-ticket "tickets/features/foo/02-b.md" in-progress >/dev/null 2>&1
-out="$(wf "$proj" "$sd" tickets --feature foo 2>/dev/null)"
-check_contains "tickets --feature: lists foo/01 done"        "01-a.md"$'\t'"done" "$out"
-check_contains "tickets --feature: counts only foo (1/2)"    "1/2 done" "$out"
-rm -rf "$proj" "$sd"
+# empty tracker -> 0/0
+p="$(newp)"; ( cd "$p" && bash "$SCRIPT" init >/dev/null 2>&1 )
+check_contains "tickets: empty is 0/0" "0/0 done" "$( cd "$p" && bash "$SCRIPT" tickets 2>/dev/null )"
+rm -rf "$p"
 
 # unknown command -> non-zero
-proj="$(new_repo)"; sd="$(mktemp -d)"
-wf "$proj" "$sd" bogus >/dev/null 2>&1
+p="$(newp)"; ( cd "$p" && bash "$SCRIPT" bogus >/dev/null 2>&1 )
 check "unknown command: non-zero" "1" "$?"
-rm -rf "$proj" "$sd"
-
-# ── Ticket 02: approval pins, check-ready, graph-validate ────────────────────
-
-# helper: a repo mid-feature with committed tickets on a feature branch
-feature_repo() {  # -> prints "proj sd slug"; ledger already at 'designing' via start-feature
-    local proj sd slug=demo br; proj="$(new_repo)"; sd="$(mktemp -d)"
-    br=$( cd "$proj" && git rev-parse --abbrev-ref HEAD )
-    ( cd "$proj"
-      WORKFLOW_STATE_DIR="$sd" bash "$SCRIPT" init >/dev/null 2>&1
-      WORKFLOW_STATE_DIR="$sd" bash "$SCRIPT" start-feature "$slug" "$br" >/dev/null 2>&1
-      mkdir -p "tickets/features/$slug"
-      printf '**Blocked by:** None\n' > "tickets/features/$slug/01-a.md"   # status lives in the map, not the file
-      printf '**Blocked by:** 01\n'   > "tickets/features/$slug/02-b.md"
-      git add -A && git commit -qm tickets )
-    printf '%s %s %s' "$proj" "$sd" "$slug"
-}
-
-# approve-spec / approve-tickets record pins + transition
-read -r proj sd slug <<<"$(feature_repo)"
-sha=$( cd "$proj" && git rev-parse HEAD )
-wf "$proj" "$sd" approve-spec "$sha" >/dev/null 2>&1
-check "approve-spec: status spec-approved" "0" "$?"
-check_contains "approve-spec: records commit" "spec_commit: $sha" "$(cat "$sd/state.yaml")"
-wf "$proj" "$sd" approve-tickets "$sha" "tickets/features/$slug/01-a.md" "tickets/features/$slug/02-b.md" >/dev/null 2>&1
-check "approve-tickets: ok" "0" "$?"
-check_contains "approve-tickets: status ready-to-work" "status: ready-to-work" "$(cat "$sd/state.yaml")"
-# check-ready passes when clean
-wf "$proj" "$sd" check-ready >/dev/null 2>&1
-check "check-ready: clean passes" "0" "$?"
-# digest drift -> fail closed
-( cd "$proj" && printf 'DRIFT\n' >> "tickets/features/$slug/01-a.md" )
-wf "$proj" "$sd" check-ready >/dev/null 2>&1
-check "check-ready: digest drift fails" "1" "$?"
-rm -rf "$proj" "$sd"
-
-# check-ready fails when status isn't ready-to-work
-read -r proj sd slug <<<"$(feature_repo)"
-wf "$proj" "$sd" set-status triaging >/dev/null 2>&1
-wf "$proj" "$sd" check-ready >/dev/null 2>&1
-check "check-ready: wrong status fails" "1" "$?"
-rm -rf "$proj" "$sd"
-
-# graph-validate: clean graph passes; a cycle fails
-read -r proj sd slug <<<"$(feature_repo)"
-wf "$proj" "$sd" graph-validate "$slug" >/dev/null 2>&1
-check "graph-validate: clean passes" "0" "$?"
-( cd "$proj" && printf '**Blocked by:** 02\n**Status:** ready-for-agent\n' > "tickets/features/$slug/01-a.md" )  # 01<->02 cycle
-wf "$proj" "$sd" graph-validate "$slug" >/dev/null 2>&1
-check "graph-validate: cycle fails" "1" "$?"
-rm -rf "$proj" "$sd"
-
-# graph-validate: no executable frontier (every ticket blocked) fails
-read -r proj sd slug <<<"$(feature_repo)"
-( cd "$proj" && printf '**Blocked by:** 02\n**Status:** ready-for-agent\n' > "tickets/features/$slug/01-a.md"
-  printf '**Blocked by:** 01\n**Status:** ready-for-agent\n' > "tickets/features/$slug/02-b.md" )
-wf "$proj" "$sd" graph-validate "$slug" >/dev/null 2>&1
-check "graph-validate: no frontier fails" "1" "$?"
-rm -rf "$proj" "$sd"
-
-# set: records non-status fields; refuses status
-proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
-wf "$proj" "$sd" set feature demo >/dev/null 2>&1
-check "set: records feature" "0" "$?"
-check_contains "set: feature persisted" "feature: demo" "$(cat "$sd/state.yaml")"
-wf "$proj" "$sd" set status working >/dev/null 2>&1
-check "set: refuses status (must use set-status)" "1" "$?"
-rm -rf "$proj" "$sd"
-
-# ── v3 part-1 regressions ────────────────────────────────────────────────────
-
-# sed-injection: a notes value with | and & must NOT blank/corrupt the ledger
-proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
-wf "$proj" "$sd" set notes 'a|b & c' >/dev/null 2>&1
-check "ledger_set: survives pipe/ampersand (ledger intact)" "0" "$([[ -s "$sd/state.yaml" ]] && echo 0 || echo 1)"
-check_contains "ledger_set: value written literally" "notes: a|b & c" "$(cat "$sd/state.yaml")"
-check_contains "ledger_set: other fields intact" "status: idle" "$(cat "$sd/state.yaml")"
-rm -rf "$proj" "$sd"
-
-# bash-3.2 octal-id trap: ids 08/09 must validate cleanly
-proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
-mkdir -p "$proj/tickets/features/oct"
-printf '**Blocked by:** None\n**Status:** ready-for-agent\n' > "$proj/tickets/features/oct/08-a.md"
-printf '**Blocked by:** 08\n**Status:** ready-for-agent\n'   > "$proj/tickets/features/oct/09-b.md"
-wf "$proj" "$sd" graph-validate oct >/dev/null 2>&1
-check "graph-validate: 08/09 ids ok (no octal error)" "0" "$?"
-# run the same under /bin/bash (macOS 3.2) to catch declare -A / octal regressions
-if [[ -x /bin/bash ]]; then
-    ( cd "$proj" && WORKFLOW_STATE_DIR="$sd" /bin/bash "$SCRIPT" graph-validate oct >/dev/null 2>&1 )
-    check "graph-validate: works under /bin/bash" "0" "$?"
-fi
-rm -rf "$proj" "$sd"
-
-# malformed blocker ref (typo O1) is rejected, not treated as a root
-proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
-mkdir -p "$proj/tickets/features/mal"
-printf '**Blocked by:** O1 (typo)\n**Status:** ready-for-agent\n' > "$proj/tickets/features/mal/01-a.md"
-wf "$proj" "$sd" graph-validate mal >/dev/null 2>&1
-check "graph-validate: malformed blocker rejected" "1" "$?"
-rm -rf "$proj" "$sd"
-
-# tickets --feature with no slug -> usage error, not an infinite loop
-proj="$(new_repo)"; sd="$(mktemp -d)"; wf "$proj" "$sd" init >/dev/null 2>&1
-rc=$( ( cd "$proj" && WORKFLOW_STATE_DIR="$sd" bash "$SCRIPT" tickets --feature >/dev/null 2>&1 ); echo $? )
-check "tickets --feature (no slug): errors, no hang" "1" "$rc"
-rm -rf "$proj" "$sd"
-
-# ── v3 part-2: status map, closed bundle, atomic lifecycle, resume ───────────
-
-# set-ticket writes to the map; tickets --feature reads status from the map (not the file)
-read -r proj sd slug <<<"$(feature_repo)"
-wf "$proj" "$sd" set-ticket "tickets/features/$slug/01-a.md" done >/dev/null 2>&1
-out="$(wf "$proj" "$sd" tickets --feature "$slug" 2>/dev/null)"
-check_contains "set-ticket: status from map (01 done)" "01-a.md"$'\t'"done" "$out"
-check_contains "set-ticket: 02 defaults ready-for-agent" "02-b.md"$'\t'"ready-for-agent" "$out"
-check_contains "set-ticket: 1/2 done" "1/2 done" "$out"
-rm -rf "$proj" "$sd"
-
-# closed bundle: a ticket added after approval -> check-ready refuses
-read -r proj sd slug <<<"$(feature_repo)"; sha=$( cd "$proj" && git rev-parse HEAD )
-wf "$proj" "$sd" approve-spec "$sha" >/dev/null 2>&1
-wf "$proj" "$sd" approve-tickets "$sha" "tickets/features/$slug/01-a.md" "tickets/features/$slug/02-b.md" >/dev/null 2>&1
-wf "$proj" "$sd" check-ready >/dev/null 2>&1; check "closed-set: baseline check-ready passes" "0" "$?"
-( cd "$proj" && printf '**Blocked by:** None\n' > "tickets/features/$slug/03-sneaky.md" )   # unapproved extra
-wf "$proj" "$sd" check-ready >/dev/null 2>&1
-check "closed-set: unapproved extra ticket refused" "1" "$?"
-rm -rf "$proj" "$sd"
-
-# status mutation no longer breaks approval (status is out of the hashed file), and resume works
-read -r proj sd slug <<<"$(feature_repo)"; sha=$( cd "$proj" && git rev-parse HEAD )
-wf "$proj" "$sd" approve-spec "$sha" >/dev/null 2>&1
-wf "$proj" "$sd" approve-tickets "$sha" "tickets/features/$slug/01-a.md" "tickets/features/$slug/02-b.md" >/dev/null 2>&1
-wf "$proj" "$sd" set-status working >/dev/null 2>&1
-wf "$proj" "$sd" set-ticket "tickets/features/$slug/01-a.md" in-progress >/dev/null 2>&1   # sanctioned mutation
-wf "$proj" "$sd" resume >/dev/null 2>&1
-check "resume: works after status mutation (digest stable)" "0" "$?"
-check_contains "resume: status back to working" "status: working" "$(cat "$sd/state.yaml")"
-rm -rf "$proj" "$sd"
-
-# start-feature refuses from a busy state
-read -r proj sd slug <<<"$(feature_repo)"   # already 'designing'
-wf "$proj" "$sd" start-feature other some-branch >/dev/null 2>&1
-check "start-feature: refused while a feature is active" "1" "$?"
-check_contains "start-feature: ledger unchanged (still demo)" "feature: demo" "$(cat "$sd/state.yaml")"
-rm -rf "$proj" "$sd"
-
-# finish merged -> idle + all feature state cleared
-read -r proj sd slug <<<"$(feature_repo)"; sha=$( cd "$proj" && git rev-parse HEAD )
-wf "$proj" "$sd" approve-spec "$sha" >/dev/null 2>&1
-wf "$proj" "$sd" approve-tickets "$sha" "tickets/features/$slug/01-a.md" "tickets/features/$slug/02-b.md" >/dev/null 2>&1
-wf "$proj" "$sd" set-status working >/dev/null 2>&1
-wf "$proj" "$sd" set-status shipping >/dev/null 2>&1
-wf "$proj" "$sd" finish merged >/dev/null 2>&1
-check "finish merged: status idle" "0" "$?"
-check_contains "finish merged: status idle" "status: idle" "$(cat "$sd/state.yaml")"
-check_contains "finish merged: feature cleared" "feature: null" "$(cat "$sd/state.yaml")"
-check "finish merged: manifest removed" "yes" "$([[ ! -f "$sd/manifest.tsv" ]] && echo yes || echo no)"
-rm -rf "$proj" "$sd"
+rm -rf "$p"
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]

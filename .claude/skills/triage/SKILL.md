@@ -1,43 +1,34 @@
 ---
 name: triage
 disable-model-invocation: true
-description: Decide what to build from an inbound request, working a LOCAL inbox queue only (never GitHub/Jira). Inlines Matt Pocock's triage state machine (his triage skill is user-only) and uses model-invocable grilling/domain-modeling when a request needs shaping. Separate from feature execution. Invoke explicitly as the first gate; skip for solo idea-driven work (go straight to /feature).
+description: Decide what to build from an inbound request, working a LOCAL flat ticket tracker only (never GitHub/Jira). Inlines Matt Pocock's triage logic (his triage skill is user-only). A human-driven checklist. Invoke explicitly as the first gate; skip for solo idea-driven work (go straight to /feature).
 when_to_use: When there is an inbound queue of requests/bugs to evaluate before committing to build. The user runs /triage. Skip for solo idea-driven work.
-version: 2.0.0
+version: 3.0.0
 languages: all
 ---
 
-# /triage — decide what to build (v2, local inbox)
+# /triage — decide what to build
 
-Router. Shared rules + the v2 state model are in
-`~/.claude/skills/dev-workflow/workflow.md`.
-
-`W=~/.claude/skills/dev-workflow/scripts/workflow-state.sh`
+A human-driven checklist over the flat local `tickets/` (never GitHub/Jira).
+Shared rules: `~/.claude/skills/dev-workflow/workflow.md`.
 
 ## Steps
 
-1. **Ensure the tracker exists:** `bash $W init` (creates `tickets/inbox/` +
-   `tickets/features/`). `bash $W set-status triaging`.
+1. `bash ~/.claude/skills/dev-workflow/scripts/workflow-state.sh init` if the
+   tracker doesn't exist yet.
 
-2. **Triage the request (inlined — Matt's `triage` is user-only)** against the
-   LOCAL `tickets/inbox/` (never GitHub/Jira):
-   - Intake items are `tickets/inbox/<id>.md`.
-   - **Category:** bug | enhancement.
-   - **Redundancy / prior-rejection:** search the codebase by domain concept and
-     read `docs/decisions/` ADRs; if already implemented → `wontfix`.
-   - **Verify** the claim where you can (reproduce a bug).
-   - **State** (the item's `**Status:**` line): `needs-triage` | `needs-info` |
-     `ready-for-human` | `wontfix` | `ready-for-feature`.
+2. **Triage the request (inline — Matt's `triage` is user-only):**
+   - Category: bug | enhancement.
+   - Redundancy / prior-rejection: search the codebase by domain concept, read
+     `docs/decisions/` ADRs; if already implemented → `wontfix`.
+   - Verify the claim where you can (reproduce a bug).
+   - Decide a status for the ticket: `ready-for-agent` | `needs-info` |
+     `ready-for-human` | `wontfix`.
    - If it needs shaping, invoke `mattpocock-skills:grilling` +
-     `mattpocock-skills:domain-modeling` (model-invocable).
+     `mattpocock-skills:domain-modeling`, or hand to `/feature`.
 
-   Inbox items **never** count toward a feature's completion — `/work` and
-   `/ship` operate only on `tickets/features/<slug>/`.
+3. **HUMAN GATE ↯** — present your category + status recommendation; the
+   maintainer directs. Record the outcome as a `tickets/<id>.md` with a
+   `**Status:**` line.
 
-3. **HUMAN GATE ↯** — present your category + state recommendation; the
-   maintainer directs. Apply the outcome to the inbox item.
-
-4. **Adopt → build.** When an item becomes `ready-for-feature`, hand off to
-   `/feature` (it creates the branch+worktree and the feature's ticket dir). Then
-   `bash $W set-status idle` if no feature is being started now, or let `/feature`
-   drive from here.
+Adopting an item for build → hand off to `/feature`.

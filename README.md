@@ -77,23 +77,22 @@ the tuned upstream skills in order and stop at human gates; they do not
 reimplement upstream content.
 
 ```
-/triage   → work the inbox queue         (skip if no queue)
-/feature  → branch+worktree, design       approve spec, then approve tickets (commit-pinned)
-/work     → execute the feature           autonomous within the approved envelope
-/ship     → verify + integrate            choose merge / PR / keep
+/triage   → decide what to build          (skip if no queue)
+/feature  → design + break down            approve spec, then approve tickets
+/work     → execute the tickets            autonomous between tickets
+/ship     → verify + integrate             choose merge / PR / keep
 ```
 
-`dev-workflow/` holds the shared reference (`workflow.md`, the single source of
-truth — read it for the full v2 model + [ADR](docs/decisions/0001-dev-workflow-v2.md))
-and `scripts/workflow-state.sh`, a **validated state machine**. All
-triage/specs/tickets are local files (never GitHub/Jira). Layout: intake in
-`tickets/inbox/`, an approved feature's tickets in `tickets/features/<slug>/`,
-`docs/specs/` + `docs/decisions/`, `CONTEXT.md`, and the **ledger in the
-git-common-dir** (`$(git rev-parse --git-common-dir)/dev-workflow/state.yaml`, so
-all worktrees share one copy). `/feature` creates a branch+worktree first and
-commit-pins each approval; `/work` refuses drifted/unapproved work. One active
-feature per repo. Run `workflow-state.sh init` to scaffold. Tests:
-`bash tests/dev-workflow/test.sh`.
+They are **human-driven checklists**, deliberately not a state machine (a robust
+state-machine attempt was abandoned as over-engineered — see
+[ADR 0001](docs/decisions/0001-dev-workflow-simple.md)). `dev-workflow/` holds the
+shared reference (`workflow.md`) and a trivial `scripts/workflow-state.sh` that
+only scaffolds and lists (`init`, `tickets`). All triage/specs/tickets are local
+files (never GitHub/Jira): flat `tickets/<NN>-<slug>.md` (with a `**Status:**`
+line), `docs/specs/`, `docs/decisions/`, `CONTEXT.md`. No ledger, no
+commit-pinning, no transactions — the human drives the gates. `/work`'s value is
+the dual-model review (Superpowers + `reviewers:codex` + the Fowler smell lens).
+Run `workflow-state.sh init` to scaffold. Tests: `bash tests/dev-workflow/test.sh`.
 
 ### Helper scripts: symlink from ~/bin
 
