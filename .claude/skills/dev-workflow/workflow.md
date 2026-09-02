@@ -57,15 +57,26 @@ routers (their logic is interview-free), not invoked.
 
 ## Review model
 
-`/work` reviews **each ticket** as it lands (fast feedback), and `/ship` runs a
-**whole-feature** review over the entire branch (`<feature-base>..HEAD`) — Claude
-via `requesting-code-review` **and** `reviewers:codex --base <feature-base>`
-together. The whole-feature pass restores cross-ticket coverage and produces a
-push-gate sentinel keyed to the **current checkout's** `<feature-base>..HEAD`
-diff (a per-ticket sentinel won't match it). Note the sentinel attests *that a
-review of this checkout ran* — it is not bound to the push's refs or remote tip,
-so it's a review nudge, not proof the pushed objects were reviewed. The
-`<feature-base>` is the `**Base:**` recorded in the spec.
+Every review is **two reads on the same diff**: your host's own model (via
+`superpowers:requesting-code-review`) plus a **cross-model** second opinion. The
+whole point of the second read is that it's a *different vendor's* model, so the
+cross-model reviewer depends on which host you're running in:
+
+- **If you are Claude Code** → cross-model reviewer is Codex:
+  `reviewers:codex --base <BASE>` (also writes the push-gate sentinel).
+- **If you are Codex** → cross-model reviewer is Claude, shelled out headless:
+  `git diff <BASE>..HEAD | claude -p 'You are an independent code reviewer. Review this diff for correctness, edge cases, error handling, tests, and security. List concrete findings with file:line, or reply LGTM.'`
+  Do **not** use `reviewers:codex` here — from inside Codex it's the same model as
+  your host, so it isn't a cross-model read.
+
+`/work` runs this per **ticket** as it lands (`<BASE>` = the ticket's review base;
+fast feedback); `/ship` runs it once over the **whole feature**
+(`<BASE>` = `<feature-base>`, the `**Base:**` recorded in the spec), which restores
+cross-ticket coverage. On the Claude Code host the whole-feature `reviewers:codex`
+pass also produces a push-gate sentinel keyed to the **current checkout's**
+`<feature-base>..HEAD` diff (a per-ticket sentinel won't match it); the sentinel
+attests *that a review of this checkout ran* — it is not bound to the push's refs
+or remote tip, so it's a review nudge, not proof the pushed objects were reviewed.
 
 ## Context-rot discipline
 

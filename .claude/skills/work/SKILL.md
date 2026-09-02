@@ -1,9 +1,9 @@
 ---
 name: work
 disable-model-invocation: true
-description: Execute one feature's approved tickets via Superpowers primitives per ticket (fresh implementer + TDD + a Claude review via requesting-code-review + cross-model Codex review + verification) — NOT subagent-driven-development, which would finish the branch after ticket 1. Fowler smell baseline as an extra review lens. Autonomous between tickets; the whole-feature review and finishing are /ship's job. A human-driven checklist. Invoke explicitly as /work.
+description: Execute one feature's approved tickets via Superpowers primitives per ticket (fresh implementer + TDD + a host-model review via requesting-code-review + a cross-model review + verification) — NOT subagent-driven-development, which would finish the branch after ticket 1. The cross-model reviewer is host-aware (reviewers:codex in Claude Code; claude -p headless in Codex). Fowler smell baseline as an extra review lens. Autonomous between tickets; the whole-feature review and finishing are /ship's job. A human-driven checklist. Invoke explicitly as /work.
 when_to_use: When a feature has an approved spec and local tickets and you're ready to implement. The user runs /work. Follows /feature.
-version: 3.1.0
+version: 3.2.0
 languages: all
 ---
 
@@ -46,17 +46,20 @@ ticket 1. `/work` drives the primitives and leaves finishing to `/ship`.
 
 4. **Independent review over `BASE..HEAD`** — first ensure the implementer's work
    is committed and `git status --porcelain` is empty, so both reviewers assess
-   the same committed range and the codex sentinel matches `HEAD`. Then dispatch
-   `superpowers:requesting-code-review` (the public interface — Claude) **and**
-   `reviewers:codex --base <BASE>` (cross-model, the literal sha from step 3)
-   together in one message. Give the Claude reviewer's brief the approved ticket
-   with its acceptance criteria, the relevant spec sections, and
+   the same committed range (and, on the Claude Code host, the codex sentinel
+   matches `HEAD`). Then dispatch **two reads together in one message**: your
+   host's own model via `superpowers:requesting-code-review` (the public
+   interface), **and** the **cross-model reviewer for your host** — see
+   `Review model` in workflow.md (`reviewers:codex --base <BASE>` in Claude Code;
+   `git diff <BASE>..HEAD | claude -p '<review brief>'` in Codex — use `<BASE>`,
+   the literal sha from step 3). Give the host-model reviewer's brief the approved
+   ticket with its acceptance criteria, the relevant spec sections, and
    `~/.claude/skills/dev-workflow/smell-baseline.md` (Fowler lens) — so it checks
-   spec/ticket compliance, not just diff defects; codex is the independent
-   defect-finding pass. A review only counts if **both** reviewers complete and
-   return a verdict over that range — a plugin/network/timeout failure blocks
-   progression, it is not "no findings." This is per-ticket fast feedback; the
-   whole-feature review runs in `/ship`.
+   spec/ticket compliance, not just diff defects; the cross-model read is the
+   independent defect-finding pass. A review only counts if **both** reads
+   complete and return a verdict over that range — a plugin/network/timeout
+   failure blocks progression, it is not "no findings." This is per-ticket fast
+   feedback; the whole-feature review runs in `/ship`.
 
 5. **Close only when done** — after both reviews return, every blocking finding
    is resolved, the ticket's **acceptance checkboxes are actually satisfied** (not

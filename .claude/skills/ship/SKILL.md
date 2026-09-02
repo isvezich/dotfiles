@@ -1,9 +1,9 @@
 ---
 name: ship
 disable-model-invocation: true
-description: Finish a feature — a whole-feature review over the entire branch, fresh full-suite verification, then the merge/PR/keep integration menu. Thin router over requesting-code-review + reviewers:codex + Superpowers verification-before-completion + finishing-a-development-branch. One human gate. Invoke explicitly as /ship.
+description: Finish a feature — a whole-feature review over the entire branch (host-model via requesting-code-review + a host-aware cross-model reviewer: reviewers:codex in Claude Code, claude -p headless in Codex), fresh full-suite verification, then the merge/PR/keep integration menu. One human gate. Invoke explicitly as /ship.
 when_to_use: When the feature's tickets are all done and you're ready to review the whole branch, verify, and integrate. The user runs /ship. Follows /work.
-version: 3.1.0
+version: 3.2.0
 languages: all
 ---
 
@@ -33,17 +33,20 @@ share shell variables).
    merged a *newer* target since `Base` was recorded, the old `Base` stays an
    ancestor while `<feature-base>..HEAD` balloons to include unrelated upstream
    commits. If that's happened, refresh `Base` via the spec gate before reviewing.
-   Then dispatch
-   `superpowers:requesting-code-review` (Claude, with the
-   `~/.claude/skills/dev-workflow/smell-baseline.md` Fowler lens **and** the
-   approved spec + each ticket's acceptance criteria in the brief, so the review
-   checks spec compliance, not just diff defects) **and**
-   `reviewers:codex --base <feature-base>` (an independent defect-finding pass)
-   together in one message. This restores cross-ticket coverage and writes the
-   push-gate sentinel for this checkout's `<feature-base>..HEAD` diff (per-ticket
-   sentinels won't match it; the sentinel attests the review ran, it is not bound
-   to the push's refs). A review only counts if **both** reviewers complete over
-   that range — a plugin/network/timeout failure blocks, it is not "no findings."
+   Then dispatch **two reads together in one message** (see `Review model` in
+   workflow.md): your host's own model via `superpowers:requesting-code-review`
+   (with the `~/.claude/skills/dev-workflow/smell-baseline.md` Fowler lens **and**
+   the approved spec + each ticket's acceptance criteria in the brief, so it checks
+   spec compliance, not just diff defects), **and** the **cross-model reviewer for
+   your host** over `<feature-base>..HEAD` — `reviewers:codex --base <feature-base>`
+   in Claude Code, or `git diff <feature-base>..HEAD | claude -p '<review brief>'`
+   in Codex (never `reviewers:codex` from inside Codex — same model as the host).
+   This restores cross-ticket coverage; on the Claude Code host the `reviewers:codex`
+   pass also writes the push-gate sentinel for this checkout's
+   `<feature-base>..HEAD` diff (per-ticket sentinels won't match it; the sentinel
+   attests the review ran, it is not bound to the push's refs). A review only
+   counts if **both** reads complete over that range — a plugin/network/timeout
+   failure blocks, it is not "no findings."
    Resolve every blocking finding, committing each fix and confirming a clean tree
    before re-review; a scope-changing finding sends you back to `/feature`'s
    **spec** gate (step 5). When both pass, **note `REVIEW_HEAD` = `git rev-parse
